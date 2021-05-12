@@ -2752,10 +2752,46 @@ SQLRETURN SQL_API SQLTables( //sz* not used, so Unicode API not required.
 	unsigned int ts2, ts3;
 	unsigned char t2[MDB_BIND_SIZE],
 	              t3[MDB_BIND_SIZE];
+    BOOL wantTable= FALSE,wantSystemTable=FALSE,wantView=FALSE;
 
 	TRACE("SQLTables");
 
-	mdb_read_catalog(mdb, MDB_ANY);
+    if (cbTableType==SQL_NTS)
+        cbTableType = strlen( (char*)szTableType);
+    if (cbTableType==0 || (strncmp( (char*)szTableType, "%", cbTableType)==0)) {
+        wantTable = TRUE;
+        wantSystemTable=TRUE;
+        wantView=TRUE;
+    } else {
+        // ignore single quotes and separate by commas
+        char tableKind[65], *typePtr=tableKind,*inputPtr=(char*)szTableType;
+        while( *inputPtr) {
+            //start at beginning
+            typePtr=tableKind;
+            
+            while ( *inputPtr) {
+                if (*inputPtr==',') {
+                    //done when here or at 0
+                    inputPtr++;
+                    break;
+                }
+                if (*inputPtr=='\'') {
+                    inputPtr++;
+                    continue;
+                }
+                *typePtr++=*inputPtr++;
+            }
+            *typePtr=0;
+            if (strcasecmp("TABLE", tableKind)==0)
+                wantTable=TRUE;
+            else if (strcasecmp("SYSTEM TABLE", tableKind)==0)
+                wantSystemTable=TRUE;
+            else if (strcasecmp("VIEW", tableKind)==0)
+                wantView=TRUE;
+        }
+    }
+
+    mdb_read_catalog(mdb, MDB_ANY);
 
 	ttable = mdb_create_temp_table(mdb, "#tables");
 	mdb_sql_add_temp_col(sql, ttable, 0, "TABLE_CAT", MDB_TEXT, 128, 0);
@@ -2769,11 +2805,11 @@ SQLRETURN SQL_API SQLTables( //sz* not used, so Unicode API not required.
 	for (i=0; i<mdb->num_catalog; i++) {
      		entry = g_ptr_array_index(mdb->catalog, i);
 
-		if (mdb_is_user_table(entry))
+		if (mdb_is_user_table(entry) && wantTable)
 			ttype = 0;
-		else if (mdb_is_system_table(entry))
+		else if (mdb_is_system_table(entry) && wantSystemTable)
 			ttype = 1;
-		else if (entry->object_type == MDB_QUERY)
+		else if ((entry->object_type == MDB_QUERY) && wantView)
 			ttype = 2;
 		else
 			continue;
