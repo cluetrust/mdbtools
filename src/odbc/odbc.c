@@ -2817,11 +2817,21 @@ static SQLSMALLINT _odbc_get_client_type(MdbColumn *col)
 			else
 				return SQL_TYPE_TIMESTAMP;
 #endif // returns text otherwise
-		case MDB_TEXT:
-		case MDB_MEMO:
-			return SQL_VARCHAR;
-		case MDB_OLE:
-			return SQL_LONGVARBINARY;
+        case MDB_TEXT:
+            return SQL_VARCHAR;
+            break;
+        case MDB_OLE:
+            return SQL_LONGVARBINARY;
+            break;
+        case MDB_MEMO:
+            return SQL_LONGVARCHAR;
+            break;
+        case MDB_REPID:            // GUID?
+            return SQL_GUID;
+            break;
+        case MDB_NUMERIC:
+            return SQL_NUMERIC;
+            break;
 		default:
 			// fprintf(stderr,"Unknown type %d\n",srv_type);
 			break;
