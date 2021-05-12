@@ -1719,6 +1719,26 @@ SQLRETURN SQL_API SQLGetData(
 				if (pcbValue)
 					*pcbValue = sizeof(SQLINTEGER);
 				break;
+            case SQL_C_UBIGINT:
+            case SQL_C_SBIGINT:
+                // theoretically should check size, but that's irrelevant
+                *(SQLBIGINT*)rgbValue = (SQLBIGINT)intValue;
+                if (pcbValue)
+                    *pcbValue = sizeof(SQLBIGINT);
+                break;
+                    
+            case SQL_C_FLOAT:
+                *(SQLREAL*)rgbValue = (SQLREAL)intValue;
+                if (pcbValue)
+                    *pcbValue = sizeof(SQLREAL);
+                break;
+            case SQL_C_DOUBLE:
+                *(SQLDOUBLE*)rgbValue = (SQLDOUBLE)intValue;
+                if (pcbValue)
+                    *pcbValue = sizeof(SQLDOUBLE);
+                break;
+
+
 			default:
 				strcpy(stmt->sqlState, "HYC00"); // Not implemented
 				return SQL_ERROR;
