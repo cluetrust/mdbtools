@@ -544,6 +544,9 @@ void mdb_set_shortdate_fmt(MdbHandle *mdb, const char *);
 void mdb_set_boolean_fmt_words(MdbHandle *mdb);
 void mdb_set_boolean_fmt_numbers(MdbHandle *mdb);
 int mdb_read_row(MdbTableDef *table, unsigned int row);
+#ifdef MDB_COPY_OLE
+size_t mdb_copy_ole(MdbHandle *mdb, void *dest, int start, int size);
+#endif
 
 /* money.c */
 char *mdb_money_to_string(MdbHandle *mdb, int start);

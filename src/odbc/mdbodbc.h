@@ -64,19 +64,22 @@ struct _hstmt {
 	char query[4096];
     char lastError[256];
     char sqlState[6];
-    char *ole_str;
-    size_t ole_len;
+
 	struct _sql_bind_info *bind_head;
 	int rows_affected;
-	int icol; /* SQLGetData: last column */
-	int pos; /* SQLGetData: last position (truncated result) */
+    int last_get_column;            // SQLGetData: last column
+    unsigned char *last_get_data;   // SQLGetData: pointer to last data retrieved (NULL if none)
+    SQLLEN last_get_length;         // SQLGetData: complete length of the data
+    SQLLEN last_get_offset;         // SQLGetData: last position (truncated result)
+    BOOL bindings_changed;
 };
 
 struct _sql_bind_info {
 	int column_number;
 	int column_bindtype; /* type/conversion required */
-	int column_bindlen; /* size of varaddr buffer */
-	int *column_lenbind; /* where to store length of varaddr used */
+    SQLLEN column_bindlen; /* size of varaddr buffer */
+    SQLLEN *column_lenbind; /* where to store length of varaddr used */
+    void *column_bindptr;
 	char *varaddr;
 	struct _sql_bind_info *next;
 };
@@ -85,4 +88,5 @@ struct _sql_bind_info {
 }
 #endif
 #endif
-/** @}*/
+/** @}
+ */

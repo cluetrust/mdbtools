@@ -357,7 +357,19 @@ SQLRETURN SQL_API SQLNativeSql(
     SQLINTEGER        *pcbSqlStr)
 {
 	TRACE("SQLNativeSql");
-	return SQL_SUCCESS;
+    SQLRETURN retvalue=SQL_SUCCESS;
+        
+    int length = cbSqlStrIn;
+    if (length>cbSqlStrMax-1) {
+        strcpy(((struct _hdbc *)hdbc)->sqlState, "01004");
+        length=cbSqlStrMax;
+        retvalue=SQL_SUCCESS_WITH_INFO;
+    }
+    strncpy( (char*)szSqlStr, (char*)szSqlStrIn,length);
+    szSqlStr[length]=0;
+    *pcbSqlStr=length;
+    
+    return retvalue;
 }
 
 SQLRETURN SQL_API SQLNumParams(
@@ -365,6 +377,7 @@ SQLRETURN SQL_API SQLNumParams(
     SQLSMALLINT       *pcpar)
 {
 	TRACE("SQLNumParams");
+    *pcpar = 0; // TODO: make this look, but since we don't do params, ...
 	return SQL_SUCCESS;
 }
 
@@ -529,6 +542,12 @@ SQLRETURN SQL_API SQLAllocStmt(
 	dbc = (struct _hdbc *) hdbc;
 
 	stmt = g_malloc0(sizeof(struct _hstmt));
+    if (!stmt) {
+        // if we couldn't allocate this, then return a valid error
+        strcpy(((struct _hdbc *)hdbc)->sqlState, "HY001");  // memory allocation error
+        return SQL_ERROR;
+    }
+    
 	stmt->hdbc=dbc;
 	g_ptr_array_add(dbc->statements, stmt);
 	stmt->sql = mdb_sql_init();
@@ -1082,7 +1101,7 @@ SQLRETURN SQL_API SQLFetch(
 			cur = cur->next;
 		}
 		stmt->rows_affected++;
-		stmt->pos=0;
+		stmt->last_get_offset=0;
 		return final_retval;
 	} else {
 		return SQL_NO_DATA_FOUND;
@@ -1144,8 +1163,8 @@ SQLRETURN SQL_API SQLFreeStmt(
 	struct _hdbc *dbc = (struct _hdbc *) stmt->hdbc;
 
 	TRACE("SQLFreeStmt");
-	free(stmt->ole_str);
-	stmt->ole_str = NULL;
+	free(stmt->last_get_data);
+	stmt->last_get_data = NULL;
 	if (fOption==SQL_DROP) {
 		if (!g_ptr_array_remove(dbc->statements, stmt))
 			return SQL_INVALID_HANDLE;
@@ -1427,7 +1446,7 @@ SQLRETURN SQL_API SQLGetData(
 	MdbSQL *sql;
 	MdbHandle *mdb;
 	MdbSQLColumn *sqlcol;
-	MdbColumn *col;
+	MdbColumn *col=NULL;
 	MdbTableDef *table;
 	int i, intValue;
 
@@ -1436,8 +1455,13 @@ SQLRETURN SQL_API SQLGetData(
 	sql = stmt->sql;
 	mdb = sql->mdb;
 
+    if (cbValueMax<0) {
+        strcpy( stmt->sqlState, "HY090");    // Invalid string or buffer length
+        return SQL_ERROR;
+    }
+    
 	if (icol<1 || icol>sql->num_columns) {
-		strcpy(stmt->sqlState, "07009");
+		strcpy(stmt->sqlState, "07009");    // column can't be found
 		return SQL_ERROR;
 	}
 
@@ -1449,19 +1473,76 @@ SQLRETURN SQL_API SQLGetData(
 			break;
 		}
 	}
-	if (i==table->num_cols)
-		return SQL_ERROR;
+    if (!col) {
+        strcpy(stmt->sqlState, "07009");    // column can't be found
+        return SQL_ERROR;
+    }
 
-	if (icol!=stmt->icol) {
-		stmt->icol=icol;
-		stmt->pos=0;
-	}
+    if (!rgbValue) {
+        strcpy(stmt->sqlState, "HY009");    // Invalid argument value
+        return SQL_ERROR;
+    }
 
-	if (!rgbValue) {
-		strcpy(stmt->sqlState, "HY009");
-	 	return SQL_ERROR;
-	}
+    if (stmt->last_get_column == icol) {
+        // multiple retrieves to get remaining data
+        if (!stmt->last_get_data) {
+            // if we cleard out the data, we don't have anything left
+            return SQL_NO_DATA;
+        }
+        // at this point, we have data remaining in the array that we picked up for the user on the previous get, so let's
+        // portion that out.
+        // theoretically, this should only happen on true variable-length types
+        if (fCType == SQL_C_CHAR) {
+            // strings need to be terminated
+            if (cbValueMax>(stmt->last_get_length-stmt->last_get_offset)) {
+                // holds the whole string and the NUL
+                if (pcbValue)
+                    *pcbValue=stmt->last_get_length-stmt->last_get_offset;
+                memcpy( rgbValue, stmt->last_get_data+stmt->last_get_offset, stmt->last_get_length-stmt->last_get_offset);
+                ((char*)rgbValue)[stmt->last_get_length-stmt->last_get_offset] = 0; // NUL terminate
+                free( stmt->last_get_data);
+                stmt->last_get_data = NULL;
+                return SQL_SUCCESS;
+            } else {
+                // send as much data as we can
+                if (pcbValue)
+                    *pcbValue = stmt->last_get_length-stmt->last_get_offset;
+                if (cbValueMax>1) {
+                    memcpy( rgbValue, stmt->last_get_data+stmt->last_get_offset, cbValueMax-1);
+                    ((char*)rgbValue)[cbValueMax-1] = 0; // NUL terminate
+                    stmt->last_get_offset += cbValueMax-1;
+                }
+                strcpy(stmt->sqlState, "01004"); // data truncation state
+                return SQL_SUCCESS_WITH_INFO;
+            }
+        } else {
+            // should only get here if it's the binary type at this point
+            if (cbValueMax>=(stmt->last_get_length-stmt->last_get_offset)) {
+                // holds the whole block
+                if (pcbValue)
+                    *pcbValue=stmt->last_get_length-stmt->last_get_offset;
+                memcpy( rgbValue, stmt->last_get_data+stmt->last_get_offset, stmt->last_get_length-stmt->last_get_offset);
+                free( stmt->last_get_data);
+                stmt->last_get_data = NULL;
+                return SQL_SUCCESS;
+            } else {
+                // send as much data as we can
+                if (pcbValue)
+                    *pcbValue = stmt->last_get_length-stmt->last_get_offset;
+                if (cbValueMax>0) {
+                    memcpy( rgbValue, stmt->last_get_data+stmt->last_get_offset, cbValueMax);
+                    stmt->last_get_offset += cbValueMax;
+                }
+                strcpy(stmt->sqlState, "01004"); // data truncation state
+                return SQL_SUCCESS_WITH_INFO;
+            }
+        }
+    }
 
+    // fresh retrieve at this point
+    stmt->last_get_column=icol;
+    stmt->last_get_offset=0;
+	
 	if (col->col_type == MDB_BOOL) {
 		// bool cannot be null
 		*(BOOL*)rgbValue = col->cur_value_len ? 0 : 1;
@@ -1486,6 +1567,7 @@ SQLRETURN SQL_API SQLGetData(
 		for (cur = stmt->bind_head; cur; cur=cur->next) {
 			if (cur->column_number == icol) {
 				fCType = cur->column_bindtype;
+                // TODO: we should break here and check for !cur and return error, instead of using GOTO
 				goto found_bound_type;
 			}
 		}
@@ -1493,6 +1575,60 @@ SQLRETURN SQL_API SQLGetData(
 		return SQL_ERROR;
 	}
 	found_bound_type:
+    
+    // at this point, we're talking to the column for the first time, if it's a variable length column, then we
+    // need to grab the data, stick it in a buffer if it's too long, and start parceling it out
+    // we have a value
+
+    if (col->col_type==MDB_OLE) {
+        if (fCType!= SQL_C_BINARY)  {
+            // OLE can only be Binary
+            strcpy(stmt->sqlState, "07006");
+            return SQL_ERROR;
+        }
+        // OLE column types are particularly annoying, since they have highly variable lengths
+        SQLLEN ole_length =  mdb_copy_ole( mdb, NULL, col->cur_value_start, col->cur_value_len);
+        if (ole_length<=cbValueMax) {
+            mdb_copy_ole( mdb, rgbValue, col->cur_value_start, col->cur_value_len);
+            if (pcbValue)
+                *pcbValue = ole_length;
+            return SQL_SUCCESS;
+        } else {
+            // didn't fit, so allocate our buffer and manage it
+            stmt->last_get_length = ole_length;
+            stmt->last_get_data = malloc( ole_length);
+            stmt->last_get_offset=0;
+            
+            if (!stmt->last_get_data) {
+                // memory allocation error
+                strcpy(stmt->sqlState,"HY001");
+                return SQL_ERROR;
+            }
+            strcpy(stmt->sqlState, "01004");    // data truncation state
+            
+            // call it again for the copy
+            ole_length = mdb_copy_ole( mdb, stmt->last_get_data, col->cur_value_start, col->cur_value_len);
+            //assert( ole_length==stmt->last_get_length, "length changed");
+            if (pcbValue)
+                *pcbValue = stmt->last_get_length;
+            if (cbValueMax==0) {
+                // if they send us 0 to ask, then we should tell them
+                return SQL_SUCCESS_WITH_INFO;
+            }
+            memcpy(rgbValue, stmt->last_get_data, cbValueMax);
+            stmt->last_get_offset=cbValueMax;
+            return SQL_SUCCESS_WITH_INFO;
+        }
+    }
+
+    // TODO: Pay attention to the actual data type requests, and do the following special cases:
+    //        SQL_C_DEFAULT selects the defautl C data type based on the SQL Data type of the source
+    //        SQL_ERROR (07006) if we can't convert the data type
+    //        SQL_ERROR (22003) if the whole number would be truncated (1.05->1 is OK, 65537 in 16b integer is error)
+    //        SQL_ERROR (22007) invalid date/time format in the data file when trying to put into date,time, or timestamp
+    //        SQL_ERROR .... more in the docs
+    
+
 	if (fCType==SQL_C_DEFAULT)
 		fCType = _odbc_get_client_type(col);
 	if (fCType == SQL_C_CHAR)
@@ -1615,45 +1751,7 @@ SQLRETURN SQL_API SQLGetData(
 		}
 #endif
         case MDB_OLE:
-			if (cbValueMax < 0) {
-				strcpy(stmt->sqlState, "HY090"); // Invalid string or buffer length
-				return SQL_ERROR;
-			}
-			if (stmt->pos == 0) {
-				if (stmt->ole_str) {
-					free(stmt->ole_str);
-				}
-				stmt->ole_str = mdb_ole_read_full(mdb, col, &stmt->ole_len);
-			}
-			if (stmt->pos >= stmt->ole_len) {
-				return SQL_NO_DATA;
-			}
-			if (pcbValue) {
-				*pcbValue = stmt->ole_len - stmt->pos;
-			}
-			if (cbValueMax == 0) {
-				return SQL_SUCCESS_WITH_INFO;
-			}
-			/* if the column type is OLE, then we don't add terminators
-			   see https://docs.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function?view=sql-server-ver15
-			   and https://www.ibm.com/support/knowledgecenter/SSEPEK_11.0.0/odbc/src/tpc/db2z_fngetdata.html
-
-			   "The buffer that the rgbValue argument specifies contains nul-terminated values, unless you retrieve
-			   binary data, or the SQL data type of the column is graphic (DBCS) and the C buffer type is SQL_C_CHAR."
-			   */
-			const int totalSizeRemaining = stmt->ole_len - stmt->pos;
-			const int partsRemain = cbValueMax < totalSizeRemaining;
-			const int sizeToReadThisPart = partsRemain ? cbValueMax : totalSizeRemaining;
-			memcpy(rgbValue, stmt->ole_str + stmt->pos, sizeToReadThisPart);
-
-			if (partsRemain) {
-				stmt->pos += cbValueMax;
-				strcpy(stmt->sqlState, "01004"); // truncated
-				return SQL_SUCCESS_WITH_INFO;
-			}
-			stmt->pos = stmt->ole_len;
-			free(stmt->ole_str);
-			stmt->ole_str = NULL;
+            // won't be reached;
 			break;
 		default: /* FIXME here we assume fCType == SQL_C_CHAR */
 		to_c_char:
@@ -1670,38 +1768,58 @@ SQLRETURN SQL_API SQLGetData(
 				str = mdb_col_to_string(mdb, mdb->pg_buf,
 						col->cur_value_start, col->col_type, col->cur_value_len);
 			}
-			size_t len = strlen(str);
+            size_t len=0;
+            if (str)
+                len = strlen(str);
+            
+            if (col->col_type != MDB_MEMO) {
+                // all other types are required to be governed by the length the user asked for
+                if (len>=cbValueMax) {
+                    // perform the truncation
+                    len =cbValueMax-1;
+                    // TODO: do the right thing with truncated significant values
+                }
+            }
+            if (len <1) {
+                // no string is a "successful" 0-length pull
+                if (cbValueMax>0)
+                    ((char*)rgbValue)[0]=0;
+                if (pcbValue)
+                    *pcbValue = 0;
+                if (str)
+                    free(str);
+                return SQL_SUCCESS;
+            }
 
-			if (stmt->pos >= len) {
-				free(str);
-				str = NULL;
-				return SQL_NO_DATA;
-			}
-			if (pcbValue) {
-				*pcbValue = len - stmt->pos;
-			}
-			if (cbValueMax == 0) {
-				free(str);
-				str = NULL;
-				return SQL_SUCCESS_WITH_INFO;
-			}
-
-			const int totalSizeRemaining = len - stmt->pos;
-			const int partsRemain = cbValueMax - 1 < totalSizeRemaining;
-			const int sizeToReadThisPart = partsRemain ? cbValueMax - 1 : totalSizeRemaining;
-			memcpy(rgbValue, str + stmt->pos, sizeToReadThisPart);
-
-			((char *)rgbValue)[sizeToReadThisPart] = '\0';
-
-			if (partsRemain) {
-				stmt->pos += cbValueMax - 1;
-				free(str); str = NULL;
-				strcpy(stmt->sqlState, "01004"); // truncated
-				return SQL_SUCCESS_WITH_INFO;
-			}
-			stmt->pos = len;
-			free(str);
-			str = NULL;
+            // now copy whatever will fit and go around again.
+            if (cbValueMax>len) {
+                // holds the whole string and the NUL
+                memcpy( rgbValue, str, len);
+                ((char*)rgbValue)[len]=0;    // NULL Terminate
+                free( str);
+                if (pcbValue)
+                    *pcbValue=len;
+                return SQL_SUCCESS;
+            } else {
+                // send what we can and bump the pointers
+                if (cbValueMax>1) {
+                    memcpy( rgbValue, str, cbValueMax-1);
+                    ((char*)rgbValue)[cbValueMax-1]=0;
+                    stmt->last_get_offset= cbValueMax-1;
+                } else {
+                    stmt->last_get_offset= 0;
+                }
+                if (pcbValue)
+                    *pcbValue= len;
+                // TODO: the following should only happen for variable length data
+                // if it is CHAR X then it should truncate, same with everything else
+                
+                stmt->last_get_length = len;
+                stmt->last_get_data = (unsigned char*)str;
+                strcpy(stmt->sqlState, "01004");    // data truncation state
+                return SQL_SUCCESS_WITH_INFO;
+            }
+                    
 			break;
 		}
 	}
