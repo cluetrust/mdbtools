@@ -1560,14 +1560,7 @@ SQLRETURN SQL_API SQLGetData(
     stmt->last_get_column=icol;
     stmt->last_get_offset=0;
 	
-	if (col->col_type == MDB_BOOL) {
-		// bool cannot be null
-		*(BOOL*)rgbValue = col->cur_value_len ? 0 : 1;
-		if (pcbValue)
-			*pcbValue = 1;
-		return SQL_SUCCESS;
-	}
-	if (col->cur_value_len == 0) {
+	if (col->cur_value_len == 0 && col->col_type != MDB_BOOL) {
 		/* When NULL data is retrieved, non-null pcbValue is
 		   required */
 		if (!pcbValue) {
@@ -1648,19 +1641,46 @@ SQLRETURN SQL_API SQLGetData(
 
 	if (fCType==SQL_C_DEFAULT)
 		fCType = _odbc_get_client_type(col);
-	if (fCType == SQL_C_CHAR)
+
+    // retrieve numerics before we start looking at the output type
+    switch(col->col_type) {
+        case MDB_BOOL:
+            // bool cannot be null
+            intValue = !col->cur_value_len;
+            if (fCType==SQL_C_CHAR) {
+                if (cbValueMax>=2) {
+                    strcpy(rgbValue, intValue?"1":"0");
+                    if (pcbValue)
+                        *pcbValue = 2;
+                    return SQL_SUCCESS;
+                } else {
+                    if (pcbValue)
+                        *pcbValue = 2;
+                    return SQL_SUCCESS_WITH_INFO;
+                }
+            }
+            break;
+        case MDB_BYTE:
+            intValue = (int)mdb_get_byte(mdb->pg_buf, col->cur_value_start);
+            break;
+        case MDB_INT:
+            intValue = mdb_get_int16(mdb->pg_buf, col->cur_value_start);
+            break;
+        case MDB_LONGINT:
+            intValue = mdb_get_int32(mdb->pg_buf, col->cur_value_start);
+            break;
+        default:
+            // non-numeric
+            intValue = 0;
+    }
+    
+    if (fCType == SQL_C_CHAR)
 		goto to_c_char;
 	switch(col->col_type) {
+        case MDB_BOOL:
 		case MDB_BYTE:
-			intValue = (int)mdb_get_byte(mdb->pg_buf, col->cur_value_start);
-			goto to_integer_type;
 		case MDB_INT:
-			intValue = mdb_get_int16(mdb->pg_buf, col->cur_value_start);
-			goto to_integer_type;
 		case MDB_LONGINT:
-			intValue = mdb_get_int32(mdb->pg_buf, col->cur_value_start);
-			goto to_integer_type;
-		to_integer_type:
 			switch (fCType) {
 			case SQL_C_UTINYINT:
 				if (intValue<0 || intValue>UCHAR_MAX) {
@@ -1749,11 +1769,13 @@ SQLRETURN SQL_API SQLGetData(
 			*(float*)rgbValue = mdb_get_single(mdb->pg_buf, col->cur_value_start);
 			if (pcbValue)
 				*pcbValue = sizeof(float);
+            // TODO: add coercion
 			break;
 		case MDB_DOUBLE:
 			*(double*)rgbValue = mdb_get_double(mdb->pg_buf, col->cur_value_start);
 			if (pcbValue)
 			  *pcbValue = sizeof(double);
+            // TODO: add coercion
 			break;
 #if ODBCVER >= 0x0300
 		// returns text if old odbc
