@@ -1902,6 +1902,50 @@ SQLRETURN SQL_API SQLGetFunctions(
 	return SQL_SUCCESS;
 }
 
+static SQLRETURN odbc_string_out( struct _hdbc *hdbc, char *destination, const char *source, int length, SQLSMALLINT *lengthOut)
+{
+    SQLLEN stringLength = strlen( source);
+    
+    if (lengthOut)
+        *lengthOut = stringLength;    // always get the size
+
+    if (length<=stringLength) {
+        length --;    // make room for the NUL termination
+        strncpy( destination, source, stringLength);
+        destination[stringLength]=0;    // NUL termination
+        strcpy(hdbc->sqlState, "HYC00");        // String data, right truncated
+        return SQL_SUCCESS_WITH_INFO;
+    }
+    
+    strcpy( destination, source);
+    // nul is copied automatically
+    return SQL_SUCCESS;
+}
+
+static SQLRETURN odbc_uinteger_out( char *destination, SQLUINTEGER value, SQLSMALLINT *lengthOut)
+{
+    *((SQLUINTEGER*) destination)=value;
+
+    if (lengthOut)
+        *lengthOut = sizeof(SQLUINTEGER);
+    return SQL_SUCCESS;
+}
+
+static SQLRETURN odbc_usmallinteger_out( char *destination, SQLUSMALLINT value, SQLSMALLINT *lengthOut)
+{
+    *((SQLUSMALLINT*) destination)=value;
+
+    if (lengthOut)
+        *lengthOut = sizeof(SQLUSMALLINT);
+    
+    return SQL_SUCCESS;
+}
+
+static char *odbcVersion = "02.00",
+            *odbcDriverName="libMDBODBC.dylib",
+            *odbcDBMSName = "MDBTOOLS",
+            *odbcDBMSVersion="04.00.0000";        // might should be Microsoft Jet/Access
+
 SQLRETURN SQL_API SQLGetInfo(
     SQLHDBC            hdbc,
     SQLUSMALLINT       fInfoType,
@@ -1911,48 +1955,377 @@ SQLRETURN SQL_API SQLGetInfo(
 {
 	TRACE("SQLGetInfo");
 	switch (fInfoType) {
-	case SQL_MAX_STATEMENT_LEN:
-		if (rgbInfoValue)
-			*((SQLUINTEGER *)rgbInfoValue) = (SQLUINTEGER)65000;
-		if (pcbInfoValue)
-			*pcbInfoValue = sizeof(SQLUINTEGER);
-	break;
-	case SQL_SCHEMA_USAGE:
-		if (rgbInfoValue)
-			*((SQLSMALLINT *)rgbInfoValue) = (SQLSMALLINT)0;
-		if (pcbInfoValue)
-			*pcbInfoValue = sizeof(SQLSMALLINT);
-	break;
-	case SQL_CATALOG_NAME_SEPARATOR:
-		if (rgbInfoValue)
-			memcpy(rgbInfoValue, ".", 1);
-		if (pcbInfoValue)
-			*pcbInfoValue = 1;
-	break;
-	case SQL_CATALOG_LOCATION:
-		if (rgbInfoValue)
-			*((SQLSMALLINT *)rgbInfoValue) = (SQLSMALLINT)1;
-		if (pcbInfoValue)
-			*pcbInfoValue = sizeof(SQLSMALLINT);
-	break;
-	case SQL_IDENTIFIER_QUOTE_CHAR:
-		if (rgbInfoValue)
-			memcpy(rgbInfoValue, "\"", 1);
-		if (pcbInfoValue)
-			*pcbInfoValue = 1;
-	break;
-	case SQL_DBMS_NAME:
-		if (rgbInfoValue)
-			snprintf(rgbInfoValue, cbInfoValueMax, "%s", "MDBTOOLS");
-		if (pcbInfoValue)
-			*pcbInfoValue = sizeof("MDBTOOLS");
-	break;
-	case SQL_DBMS_VER:
-		if (rgbInfoValue)
-			snprintf(rgbInfoValue, cbInfoValueMax, "%s", VERSION);
-		if (pcbInfoValue)
-			*pcbInfoValue = sizeof(VERSION);
-	break;
+    case SQL_ACCESSIBLE_PROCEDURES:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);
+
+    case SQL_ACCESSIBLE_TABLES:
+        return odbc_string_out( hdbc, rgbInfoValue, "Y", cbInfoValueMax, pcbInfoValue);
+
+    case SQL_ACTIVE_ENVIRONMENTS:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // inf
+    
+    case SQL_AGGREGATE_FUNCTIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no aggregation functions
+    
+    case SQL_ALTER_DOMAIN:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // alter domain not allowed
+        
+    case SQL_ALTER_TABLE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // alter table not allowed
+    
+    case SQL_ASYNC_MODE:
+        return odbc_uinteger_out( rgbInfoValue, SQL_AM_NONE, pcbInfoValue);    // no async
+        
+//    case SQL_ASYNC_DBC_FUNCTIONS:        3.8
+    case SQL_BATCH_ROW_COUNT:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // row counts only for each statement
+    case SQL_BATCH_SUPPORT:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // don't do batch
+    case SQL_BOOKMARK_PERSISTENCE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no bookmarks, no persistence
+    case SQL_CATALOG_LOCATION:
+        // TODO: set to 1 in current mdbodbc
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // Catalogs not supported
+    case SQL_CATALOG_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // no catalogs
+    case SQL_CATALOG_NAME_SEPARATOR:
+//    case SQL_QUALIFIER_NAME_SEPARATOR:    // ODBC 3.0
+        return odbc_string_out( hdbc, rgbInfoValue, ".", cbInfoValueMax, pcbInfoValue);    // if there were catalogs, use .
+    case SQL_CATALOG_TERM:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // if there were catalogs, use .
+    case SQL_CATALOG_USAGE:
+//    case SQL_QUALIFIER_USAGE:            // ODBC 3.0
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // don't use these anywhere!
+        
+    case SQL_COLLATION_SEQ:
+        return odbc_string_out( hdbc, rgbInfoValue, "UTF-8", cbInfoValueMax, pcbInfoValue);    // ummm, not so much TODO: UNICODE
+    
+    case SQL_COLUMN_ALIAS:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // No aliases
+
+    case SQL_CONCAT_NULL_BEHAVIOR:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_CB_NULL, pcbInfoValue);        // if we did this, we'd just return NULL
+    
+    case SQL_CONVERT_BIGINT:
+    case SQL_CONVERT_BINARY:
+    case SQL_CONVERT_BIT:
+    case SQL_CONVERT_CHAR:
+    case SQL_CONVERT_DATE:
+//    case SQL_CONVERT_GUID:
+    case SQL_CONVERT_DECIMAL:
+    case SQL_CONVERT_DOUBLE:
+    case SQL_CONVERT_FLOAT:
+    case SQL_CONVERT_INTEGER:
+    case SQL_CONVERT_INTERVAL_YEAR_MONTH:
+    case SQL_CONVERT_INTERVAL_DAY_TIME:
+    case SQL_CONVERT_LONGVARBINARY:
+    case SQL_CONVERT_LONGVARCHAR:
+    case SQL_CONVERT_NUMERIC:
+    case SQL_CONVERT_REAL:
+    case SQL_CONVERT_SMALLINT:
+    case SQL_CONVERT_TIME:
+    case SQL_CONVERT_TIMESTAMP:
+    case SQL_CONVERT_TINYINT:
+    case SQL_CONVERT_VARBINARY:
+    case SQL_CONVERT_VARCHAR:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // we don't use CONVERT scalar function
+    
+    case SQL_CONVERT_FUNCTIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // we don't do convert or cast functions
+    
+    case SQL_CORRELATION_NAME:
+        return odbc_uinteger_out( rgbInfoValue, SQL_CN_NONE, pcbInfoValue);    // don't support correlation names
+
+    case SQL_CREATE_ASSERTION:
+    case SQL_CREATE_CHARACTER_SET:
+    case SQL_CREATE_COLLATION:
+    case SQL_CREATE_DOMAIN:
+    case SQL_CREATE_SCHEMA:
+    case SQL_CREATE_TABLE:
+    case SQL_CREATE_TRANSLATION:
+    case SQL_CREATE_VIEW:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no create statements at all
+
+    case SQL_CURSOR_COMMIT_BEHAVIOR:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // TODO: Figure out what this should be
+        
+    case SQL_CURSOR_ROLLBACK_BEHAVIOR:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // TODO: figure out what this should be
+    
+    case SQL_CURSOR_SENSITIVITY:
+        return odbc_uinteger_out( rgbInfoValue, SQL_UNSPECIFIED, pcbInfoValue); // we don't know
+    
+    case SQL_DATA_SOURCE_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);        // TODO: use the DSN that came in
+    
+    case SQL_DATA_SOURCE_READ_ONLY:
+        return odbc_string_out( hdbc, rgbInfoValue, "Y", cbInfoValueMax, pcbInfoValue);    // all R/O for now
+        
+    case SQL_DATABASE_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // all R/O for now
+    
+    case SQL_DATETIME_LITERALS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // don't allow date/time literals
+    
+    case SQL_DBMS_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, odbcDBMSName, cbInfoValueMax, pcbInfoValue);
+        
+    case SQL_DBMS_VER:
+        return odbc_string_out( hdbc, rgbInfoValue, odbcDBMSVersion, cbInfoValueMax, pcbInfoValue);
+        
+    case SQL_DDL_INDEX:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // we don't add/drop indexes
+    
+    case SQL_DEFAULT_TXN_ISOLATION:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // we don't do transactions
+    
+    case SQL_DESCRIBE_PARAMETER:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // no describe
+    
+    case SQL_DM_VER:    // I don't think we should respond to this, but we should test it.
+    case SQL_DRIVER_HDBC:
+    case SQL_DRIVER_HENV:
+    case SQL_DRIVER_HDESC:
+    case SQL_DRIVER_HLIB:
+    case SQL_DRIVER_HSTMT:
+        break;
+    case SQL_DRIVER_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, odbcDriverName, cbInfoValueMax, pcbInfoValue);
+        
+    case SQL_DRIVER_ODBC_VER:
+        return odbc_string_out( hdbc, rgbInfoValue, odbcVersion, cbInfoValueMax, pcbInfoValue);
+
+    case SQL_DRIVER_VER:
+        return odbc_string_out( hdbc, rgbInfoValue, VERSION, cbInfoValueMax, pcbInfoValue);
+    
+    case SQL_DROP_ASSERTION:
+    case SQL_DROP_CHARACTER_SET:
+    case SQL_DROP_COLLATION:
+    case SQL_DROP_DOMAIN:
+    case SQL_DROP_SCHEMA:
+    case SQL_DROP_TABLE:
+    case SQL_DROP_TRANSLATION:
+    case SQL_DROP_VIEW:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no drop statements at all
+    
+    case SQL_DYNAMIC_CURSOR_ATTRIBUTES1:
+    case SQL_DYNAMIC_CURSOR_ATTRIBUTES2:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no, whatever
+        
+    case SQL_EXPRESSIONS_IN_ORDERBY:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // no expressions in order by
+    
+    case SQL_FILE_USAGE:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_FILE_CATALOG, pcbInfoValue);    // every file is a complete database
+    
+    case SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES1:
+    case SQL_FORWARD_ONLY_CURSOR_ATTRIBUTES2:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no, whatever
+        
+    case SQL_GETDATA_EXTENSIONS:
+        return odbc_uinteger_out( rgbInfoValue, SQL_GD_ANY_COLUMN|SQL_GD_ANY_ORDER|SQL_GD_BOUND, pcbInfoValue);
+    
+    case SQL_GROUP_BY:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no grouping or collating
+    
+    case SQL_IDENTIFIER_CASE:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_IC_MIXED, pcbInfoValue);    // mixed case, not sensitive
+
+    case SQL_IDENTIFIER_QUOTE_CHAR:
+        return odbc_string_out( hdbc, rgbInfoValue, "\"", cbInfoValueMax, pcbInfoValue);    // no expressions in order by
+
+    case SQL_INDEX_KEYWORDS:
+        return odbc_uinteger_out( rgbInfoValue, SQL_IK_NONE, pcbInfoValue);        // no keywords supported
+
+    case SQL_INFO_SCHEMA_VIEWS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // not so much
+    
+    case SQL_INSERT_STATEMENT:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // No insert allowed
+    
+    case SQL_INTEGRITY:
+//    case SQL_ODBC_SQL_OPT_IEF
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // no data integrity enhancement facility
+
+    case SQL_KEYSET_CURSOR_ATTRIBUTES1:
+    case SQL_KEYSET_CURSOR_ATTRIBUTES2:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // No keyset cursor
+        
+    case SQL_KEYWORDS:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // all data source-specific keywords
+
+    case SQL_LIKE_ESCAPE_CLAUSE:
+        return odbc_string_out( hdbc, rgbInfoValue, "Y", cbInfoValueMax, pcbInfoValue);    // sure, we do % and _, don't we?
+        
+    case SQL_MAX_ASYNC_CONCURRENT_STATEMENTS:
+    case SQL_MAX_BINARY_LITERAL_LEN:
+    case SQL_MAX_CHAR_LITERAL_LEN:
+    case SQL_MAX_INDEX_SIZE:
+    case SQL_MAX_ROW_SIZE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // Nothing specific.
+    case SQL_MAX_ROW_SIZE_INCLUDES_LONG:
+        return odbc_string_out( hdbc, rgbInfoValue, "Y", cbInfoValueMax, pcbInfoValue);    // since it's unknown, long too
+
+    case SQL_MAX_CATALOG_NAME_LEN:
+    case SQL_MAX_COLUMN_NAME_LEN:
+    case SQL_MAX_COLUMNS_IN_GROUP_BY:
+    case SQL_MAX_COLUMNS_IN_INDEX:
+    case SQL_MAX_COLUMNS_IN_ORDER_BY:
+    case SQL_MAX_COLUMNS_IN_SELECT:
+    case SQL_MAX_COLUMNS_IN_TABLE:
+    case SQL_MAX_CONCURRENT_ACTIVITIES:
+    case SQL_MAX_CURSOR_NAME_LEN:
+    case SQL_MAX_DRIVER_CONNECTIONS:
+    case SQL_MAX_IDENTIFIER_LEN:
+    case SQL_MAX_PROCEDURE_NAME_LEN:
+    case SQL_MAX_SCHEMA_NAME_LEN:
+    case SQL_MAX_TABLE_NAME_LEN:
+    case SQL_MAX_USER_NAME_LEN:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);    // don't use schemas in SQL statements
+
+    case SQL_MAX_TABLES_IN_SELECT:
+        return odbc_usmallinteger_out( rgbInfoValue, 1, pcbInfoValue);    // no joins
+    
+    case SQL_MAX_STATEMENT_LEN:
+        return odbc_uinteger_out( rgbInfoValue, 65000, pcbInfoValue);// not really...
+
+    case SQL_MULT_RESULT_SETS:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // one result set
+
+    case SQL_MULTIPLE_ACTIVE_TXN:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // one result set
+
+    case SQL_NEED_LONG_DATA_LEN:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // don't need the length before we send
+    
+    case SQL_NON_NULLABLE_COLUMNS:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_NNC_NON_NULL, pcbInfoValue);    // sure, we can do non-nullable
+    
+    case SQL_NULL_COLLATION:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_NC_END,  pcbInfoValue);        // always at the end? TODO: verify this
+    
+    case SQL_NUMERIC_FUNCTIONS:
+        return odbc_uinteger_out( rgbInfoValue,  0, pcbInfoValue);        // support no numeric functions
+    
+    case SQL_ODBC_INTERFACE_CONFORMANCE:
+        return odbc_uinteger_out( rgbInfoValue, SQL_OIC_CORE, pcbInfoValue);    // just the basics
+    
+    case SQL_ODBC_VER:
+        break;        // should be implemented in the driver manager
+    
+    case SQL_OJ_CAPABILITIES:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);        // no outer joins
+    
+    case SQL_ORDER_BY_COLUMNS_IN_SELECT:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // don't need ORDER BY
+    
+    case SQL_PARAM_ARRAY_ROW_COUNTS:
+        return odbc_uinteger_out( rgbInfoValue, SQL_PARC_NO_BATCH, pcbInfoValue);    // one row count variable
+    
+    case SQL_PARAM_ARRAY_SELECTS:
+        return odbc_uinteger_out( rgbInfoValue, SQL_PAS_NO_SELECT, pcbInfoValue);    // can't use an array of parms
+    
+    case SQL_PROCEDURE_TERM:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no procedures
+        
+    case SQL_PROCEDURES:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // don't need ORDER BY
+    
+    case SQL_POS_OPERATIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // no pos operations
+    
+    case SQL_QUOTED_IDENTIFIER_CASE:
+        return odbc_usmallinteger_out( rgbInfoValue, SQL_IC_MIXED, pcbInfoValue);    // mixed case in quotes
+    
+    case SQL_ROW_UPDATES:
+        return odbc_string_out( hdbc, rgbInfoValue, "N", cbInfoValueMax, pcbInfoValue);    // don't think so TODO: confirm
+    
+    case SQL_SCHEMA_TERM:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no schemas
+
+    case SQL_SCHEMA_USAGE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);    // don't use schemas in SQL statements
+
+    case SQL_SCROLL_OPTIONS:
+        return odbc_uinteger_out( rgbInfoValue, SQL_SO_STATIC, pcbInfoValue);    // static result set
+
+    case SQL_SEARCH_PATTERN_ESCAPE:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no escape pattern, but there should be one TODO:
+
+    case SQL_SERVER_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no server, no name
+    
+    case SQL_SPECIAL_CHARACTERS:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no restricted characters
+    
+    case SQL_SQL_CONFORMANCE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // not really conformant at all
+    
+    case SQL_SQL92_DATETIME_FUNCTIONS:
+    case SQL_SQL92_NUMERIC_VALUE_FUNCTIONS:
+    case SQL_SQL92_STRING_FUNCTIONS:
+    case SQL_SQL92_VALUE_EXPRESSIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // not doing any of these
+
+    case SQL_SQL92_FOREIGN_KEY_DELETE_RULE:
+    case SQL_SQL92_FOREIGN_KEY_UPDATE_RULE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no foreign key support
+
+    case SQL_SQL92_GRANT:
+    case SQL_SQL92_REVOKE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no grants
+
+    case SQL_SQL92_PREDICATES:
+        return odbc_uinteger_out( rgbInfoValue,
+                SQL_SP_COMPARISON|
+                SQL_SP_ISNULL|
+                SQL_SP_ISNOTNULL|
+                SQL_SP_QUANTIFIED_COMPARISON
+                , pcbInfoValue);                // we do some of these
+    
+    case SQL_SQL92_RELATIONAL_JOIN_OPERATORS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no joins
+    
+    case SQL_SQL92_ROW_VALUE_CONSTRUCTOR:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no row value constructors
+    
+    case SQL_STANDARD_CLI_CONFORMANCE:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no CLI conformance
+    
+    case SQL_STATIC_CURSOR_ATTRIBUTES1:
+        return odbc_uinteger_out( rgbInfoValue, SQL_CA1_NEXT, pcbInfoValue);        // we can go next
+    case SQL_STATIC_CURSOR_ATTRIBUTES2:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no additional features
+    
+    case SQL_SUBQUERIES:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no sub-queries
+    
+    case SQL_SYSTEM_FUNCTIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no system functions
+        
+    case SQL_TABLE_TERM:
+        return odbc_string_out( hdbc, rgbInfoValue, "table", cbInfoValueMax, pcbInfoValue);    // table is TABLE
+    
+    case SQL_TIMEDATE_ADD_INTERVALS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no intervals
+    
+    case SQL_TIMEDATE_FUNCTIONS:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no time date functions
+    
+    case SQL_TXN_CAPABLE:
+        return odbc_usmallinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no transactions
+
+    case SQL_TXN_ISOLATION_OPTION:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no transactions
+    
+    case SQL_UNION:
+        return odbc_uinteger_out( rgbInfoValue, 0, pcbInfoValue);                // no unions
+
+    case SQL_USER_NAME:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no user name support
+    
+    case SQL_XOPEN_CLI_YEAR:
+        return odbc_string_out( hdbc, rgbInfoValue, "", cbInfoValueMax, pcbInfoValue);    // no compliance
 	default:
 		if (pcbInfoValue)
 			*pcbInfoValue = 0;
