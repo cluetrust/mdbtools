@@ -587,20 +587,39 @@ SQLRETURN SQL_API SQLBindCol(
     SQLLEN            *pcbValue)
 {
 	struct _hstmt *stmt = (struct _hstmt *) hstmt;
-	struct _sql_bind_info *cur, *newitem;
+	struct _sql_bind_info *cur, *newitem, *previous;
 
 	TRACE("SQLBindCol");
 	/* find available item in list */
+    stmt->bindings_changed = TRUE;
 	cur = stmt->bind_head;
+    previous = NULL;
 	while (cur) {
 		if (cur->column_number==icol) 
 			break;
+        previous = cur;
 		cur = cur->next;
 	}
-	/* if this is a repeat */
+
+    if (rgbValue==NULL) {
+        // this means remove the binding
+        if (!cur)
+            return SQL_SUCCESS;    // done, no binding before, none now
+        
+        if (!previous)
+            // remove the head
+            stmt->bind_head = cur->next;
+        else
+            // remove something in the middle
+            previous->next=cur->next;
+        g_free( cur);
+        return SQL_SUCCESS;
+    }
+
+    /* if this is a repeat */
 	if (cur) {
 		cur->column_bindtype = fCType;
-   		cur->column_lenbind = (int *)pcbValue;
+   		cur->column_lenbind = pcbValue;
    		cur->column_bindlen = cbValueMax;
    		cur->varaddr = (char *) rgbValue;
 	} else {
@@ -609,7 +628,7 @@ SQLRETURN SQL_API SQLBindCol(
 		newitem->column_number = icol;
 		newitem->column_bindtype = fCType;
    		newitem->column_bindlen = cbValueMax;
-   		newitem->column_lenbind = (int *)pcbValue;
+   		newitem->column_lenbind = pcbValue;
    		newitem->varaddr = (char *) rgbValue;
 		/* if there's no head yet */
 		if (! stmt->bind_head) {
@@ -1075,6 +1094,7 @@ unbind_columns(struct _hstmt *stmt)
 		cur = next;
 	}
 	stmt->bind_head = NULL;
+    stmt->bindings_changed = TRUE;
 }
 
 static void resetStatementGet( struct _hstmt *stmt)
@@ -1366,11 +1386,21 @@ SQLRETURN SQL_API SQLColumns(
 	mdb_sql_add_temp_col(sql, ttable, 17, "IS_NULLABLE", MDB_TEXT, 254, 0);
 	mdb_temp_columns_end(ttable);
 
+    // NULL or % are get all
+    // TODO: only do this test in the event that we have SQL_ATTR_METADATA_ID =SQL_TRUE in the statement
+    if (szColumnName && (strncmp((char*)szColumnName, "%",cbColumnName)==0))
+        szColumnName=NULL;
+    if (szTableName && (strncmp((char*)szTableName, "%",cbTableName)==0))
+        szTableName=NULL;
+
 	for (i=0; i<mdb->num_catalog; i++) {
-     		entry = g_ptr_array_index(mdb->catalog, i);
+     	entry = g_ptr_array_index(mdb->catalog, i);
 		/* TODO: Do more advanced matching */
-		if (entry->object_type != MDB_TABLE || g_ascii_strcasecmp((char*)szTableName, entry->object_name) != 0)
+		if (entry->object_type != MDB_TABLE)
 			continue;
+        if (szTableName && (strcasecmp((char*)szTableName, entry->object_name) != 0))
+            continue;
+
 		table = mdb_read_table(entry);
 		if ( !table )
 		{
@@ -1383,6 +1413,9 @@ SQLRETURN SQL_API SQLColumns(
 		}
 		for (j=0; j<table->num_cols; j++) {
 			col = g_ptr_array_index(table->columns, j);
+
+            if (szColumnName && (strcasecmp((char*)szColumnName, col->name)!=0))
+                continue;
 
 			ts2 = mdb_ascii2unicode(mdb, table->name, 0, (char*)t2, sizeof(t2));
 			ts3 = mdb_ascii2unicode(mdb, col->name, 0, (char*)t3, sizeof(t3));
