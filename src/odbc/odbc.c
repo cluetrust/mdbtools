@@ -1077,6 +1077,18 @@ unbind_columns(struct _hstmt *stmt)
 	stmt->bind_head = NULL;
 }
 
+static void resetStatementGet( struct _hstmt *stmt)
+{
+    // restet all of our last stuff
+    stmt->last_get_column = 0;    // flag for no columns yet
+    stmt->last_get_length=0;
+    stmt->last_get_offset = 0;
+    if (stmt->last_get_data) {
+        free(stmt->last_get_data);
+        stmt->last_get_data=NULL;
+    }
+}
+
 SQLRETURN SQL_API SQLFetch(
     SQLHSTMT           hstmt)
 {
@@ -1084,6 +1096,11 @@ SQLRETURN SQL_API SQLFetch(
 	struct _sql_bind_info *cur = stmt->bind_head;
 
 	TRACE("SQLFetch");
+    // TODO: if we bound columns, transfer them to res_info now that we have one
+    // if (stmt->bindings_changed)
+    //  bind_columns(stmt);
+    resetStatementGet( stmt);
+    
 	if ( stmt->sql->limit >= 0 && stmt->rows_affected == stmt->sql->limit ) {
 		return SQL_NO_DATA_FOUND;
 	}
