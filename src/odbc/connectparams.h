@@ -48,4 +48,5 @@ gchar*   ExtractDSN (ConnectParams* params, const gchar* connectString);
 gchar*   ExtractDBQ (ConnectParams* params, const gchar* connectString);
 
 #endif
-/** @}*/
+/** @}
+ */

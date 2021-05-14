@@ -24,13 +24,13 @@
 static int mdb_add_row_to_leaf_pg(MdbTableDef *table, MdbIndex *idx, MdbIndexPage *ipg, MdbField *idx_fields, guint32 pgnum, guint16 rownum);
 
 void
-mdb_put_int16(void *buf, guint32 offset, guint32 value)
+mdb_put_int16(void *buf, MDBOffsetType offset, guint32 value)
 {
 	value = GINT32_TO_LE(value);
 	memcpy((char*)buf + offset, &value, 2);
 }
 void
-_mdb_put_int16(void *buf, guint32 offset, guint32 value)
+_mdb_put_int16(void *buf, MDBOffsetType offset, guint32 value)
 #ifdef HAVE_ATTRIBUTE_ALIAS
 __attribute__((alias("mdb_put_int16")));
 #else
@@ -38,13 +38,13 @@ __attribute__((alias("mdb_put_int16")));
 #endif
 
 void
-mdb_put_int32(void *buf, guint32 offset, guint32 value)
+mdb_put_int32(void *buf, MDBOffsetType offset, guint32 value)
 {
 	value = GINT32_TO_LE(value);
 	memcpy((char*)buf + offset, &value, 4);
 }
 void
-_mdb_put_int32(void *buf, guint32 offset, guint32 value)
+_mdb_put_int32(void *buf, MDBOffsetType offset, guint32 value)
 #ifdef HAVE_ATTRIBUTE_ALIAS
 __attribute__((alias("mdb_put_int32")));
 #else
@@ -52,13 +52,27 @@ __attribute__((alias("mdb_put_int32")));
 #endif
 
 void
-mdb_put_int32_msb(void *buf, guint32 offset, guint32 value)
+mdb_put_uint32(void *buf, MDBOffsetType offset, guint32 value)
+{
+    memcpy((char*)buf + offset, &value, 4);
+}
+void
+_mdb_put_uint32(void *buf, MDBOffsetType offset, guint32 value)
+#ifdef HAVE_ATTRIBUTE_ALIAS
+__attribute__((alias("mdb_put_uint32")));
+#else
+{ mdb_put_uint32(buf, offset, value); }
+#endif
+
+
+void
+mdb_put_int32_msb(void *buf, MDBOffsetType offset, guint32 value)
 {
 	value = GINT32_TO_BE(value);
 	memcpy((char*)buf + offset, &value, 4);
 }
 void
-_mdb_put_int32_mdb(void *buf, guint32 offset, guint32 value)
+_mdb_put_int32_mdb(void *buf, MDBOffsetType offset, guint32 value)
 #ifdef HAVE_ATTRIBUTE_ALIAS
 __attribute__((alias("mdb_put_int32_msb")));
 #else
@@ -174,7 +188,7 @@ mdb_crack_row3(MdbHandle *mdb, unsigned int row_start, unsigned int row_end,
  * @return: number of fields present, or -1 if the buffer is invalid.
  */
 int
-mdb_crack_row(MdbTableDef *table, int row_start, size_t row_size, MdbField *fields)
+mdb_crack_row(MdbTableDef *table, MDBOffsetType row_start, MDBLengthType row_size, MdbField *fields)
 {
 	MdbColumn *col;
 	MdbCatalogEntry *entry = table->entry;
@@ -272,7 +286,7 @@ mdb_crack_row(MdbTableDef *table, int row_start, size_t row_size, MdbField *fiel
 			fields[i].siz = 0;
 			fields[i].is_null = 1;
 		}
-		if ((size_t)(fields[i].start + fields[i].siz) > row_start + row_size) {
+		if ((MDBLengthType)(fields[i].start + fields[i].siz) > row_start + row_size) {
 			fprintf(stderr, "warning: Invalid data location detected in mdb_crack_row. Table:%s Column:%i\n",table->name, i);
 			g_free(var_col_offsets);
 			return -1;
@@ -477,7 +491,7 @@ mdb_new_leaf_pg(MdbCatalogEntry *entry)
 	void *new_pg = g_malloc0(mdb->fmt->pg_size);
 		
 	mdb_put_int16(new_pg, 0, 0x0104);
-	mdb_put_int32(new_pg, 4, entry->table_pg);
+	mdb_put_uint32(new_pg, 4, entry->table_pg);
 	
 	return new_pg;
 }
@@ -489,7 +503,7 @@ mdb_new_data_pg(MdbCatalogEntry *entry)
 		
 	mdb_put_int16(new_pg, 0, 0x0101);
 	mdb_put_int16(new_pg, 2, fmt->pg_size - fmt->row_count_offset - 2);
-	mdb_put_int32(new_pg, 4, entry->table_pg);
+	mdb_put_uint32(new_pg, 4, entry->table_pg);
 	
 	return new_pg;
 }
@@ -527,7 +541,7 @@ mdb_init_index_chain(MdbTableDef *table, MdbIndex *idx)
 
 /* could be static */
 int
-mdb_update_index(MdbTableDef *table, MdbIndex *idx, unsigned int num_fields, MdbField *fields, guint32 pgnum, guint16 rownum)
+mdb_update_index(MdbTableDef *table, MdbIndex *idx, unsigned int num_fields, MdbField *fields, MDBOffsetType pgnum, MDBRowNumberType rownum)
 {
 	MdbCatalogEntry *entry = table->entry;
 	MdbHandle *mdb = entry->mdb;
@@ -620,7 +634,7 @@ mdb_add_row_to_pg(MdbTableDef *table, unsigned char *row_buffer, int new_row_siz
 {
 	void *new_pg;
 	int num_rows, i, pos, row_start;
-	size_t row_size;
+    MDBLengthType row_size;
 	MdbCatalogEntry *entry = table->entry;
 	MdbHandle *mdb = entry->mdb;
 	MdbFormatConstants *fmt = mdb->fmt;
@@ -687,7 +701,7 @@ mdb_update_row(MdbTableDef *table)
     MdbHandle *mdb = entry->mdb;
     MdbField fields[256];
     unsigned char row_buffer[4096];
-	size_t old_row_size, new_row_size;
+    MDBLengthType old_row_size, new_row_size;
     int num_fields;
 
 	if (!mdb->f->writable) {
@@ -726,7 +740,7 @@ mdb_update_row(MdbTableDef *table)
 		col = g_ptr_array_index(table->columns,i);
 		if (col->bind_ptr) {
 			fields[i].value = col->bind_ptr;
-			fields[i].siz = *(col->len_ptr);
+			fields[i].siz = (MDBLengthType)*(col->len_ptr);
 		}
 	}
 
@@ -750,17 +764,17 @@ mdb_update_row(MdbTableDef *table)
  * \note This might change on next ABI break.
  */
 int 
-mdb_replace_row(MdbTableDef *table, int row, void *new_row, int new_row_size)
+mdb_replace_row(MdbTableDef *table, MDBRowNumberType row, void *new_row, MDBLengthType new_row_size)
 {
-MdbCatalogEntry *entry = table->entry;
-MdbHandle *mdb = entry->mdb;
-int pg_size = mdb->fmt->pg_size;
-int rco = mdb->fmt->row_count_offset;
+    MdbCatalogEntry *entry = table->entry;
+    MdbHandle *mdb = entry->mdb;
+    int pg_size = mdb->fmt->pg_size;
+    int rco = mdb->fmt->row_count_offset;
 	void *new_pg;
-guint16 num_rows;
+    guint16 num_rows;
 	int row_start;
-	size_t row_size;
-int i, pos;
+    MDBLengthType row_size;
+    int i, pos;
 
 	if (mdb_get_option(MDB_DEBUG_WRITE)) {
 		mdb_buffer_dump(mdb->pg_buf, 0, 40);

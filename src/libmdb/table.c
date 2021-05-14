@@ -60,17 +60,17 @@ MdbTableDef *mdb_read_table(MdbCatalogEntry *entry)
 	MdbTableDef *table;
 	MdbHandle *mdb = entry->mdb;
 	MdbFormatConstants *fmt = mdb->fmt;
-	int row_start, pg_row;
+    MDBOffsetType row_start, pg_row;
 	void *buf, *pg_buf = mdb->pg_buf;
 	guint i;
 
 	if (!mdb_read_pg(mdb, entry->table_pg)) {
-        fprintf(stderr, "mdb_read_table: Unable to read page %lu\n", entry->table_pg);
+        fprintf(stderr, "mdb_read_table: Unable to read page %lu\n",(long)entry->table_pg);
         return NULL;
     }
 	if (mdb_get_byte(pg_buf, 0) != 0x02) {
         fprintf(stderr, "mdb_read_table: Page %lu [size=%d] is not a valid table definition page (First byte = 0x%02X, expected 0x02)\n",
-                entry->table_pg, (int)fmt->pg_size, mdb_get_byte(pg_buf, 0));
+                (long)entry->table_pg, (int)fmt->pg_size, mdb_get_byte(pg_buf, 0));
 		return NULL;
     }
 	table = mdb_alloc_tabledef(entry);
@@ -167,7 +167,7 @@ read_pg_if_8(MdbHandle *mdb, int *cur_pos)
  * are still advanced and the page cursor is still updated.
  */
 void * 
-read_pg_if_n(MdbHandle *mdb, void *buf, int *cur_pos, size_t len)
+read_pg_if_n(MdbHandle *mdb, void *buf, MDBOffsetType *cur_pos, MDBLengthType len)
 {
 	char* _buf = buf;
 	char* _end = buf ? buf + len : NULL;
@@ -182,7 +182,7 @@ read_pg_if_n(MdbHandle *mdb, void *buf, int *cur_pos, size_t len)
 		*cur_pos -= (mdb->fmt->pg_size - 8);
 	}
 	/* Copy pages into buffer */
-	while (*cur_pos + len >= (size_t)mdb->fmt->pg_size) {
+	while (*cur_pos + len >= (MDBLengthType)mdb->fmt->pg_size) {
 		size_t piece_len = mdb->fmt->pg_size - *cur_pos;
 		if (_buf) {
 			if (_buf + piece_len > _end)
@@ -236,8 +236,8 @@ GPtrArray *mdb_read_columns(MdbTableDef *table)
 	unsigned char *col;
 	unsigned int i;
 	guint j;
-	int cur_pos;
-	size_t name_sz;
+	MDBOffsetType cur_pos;
+	MDBLengthType name_sz;
 	GPtrArray *allprops;
 	
 	table->columns = g_ptr_array_new();
@@ -347,15 +347,15 @@ GPtrArray *mdb_read_columns(MdbTableDef *table)
 
 void mdb_table_dump(MdbCatalogEntry *entry)
 {
-MdbTableDef *table;
-MdbColumn *col;
-int coln;
-MdbIndex *idx;
-unsigned int i, bitn;
-guint32 pgnum;
+    MdbTableDef *table;
+    MdbColumn *col;
+    int coln;
+    MdbIndex *idx;
+    unsigned int i, bitn;
+    guint32 pgnum;
 
 	table = mdb_read_table(entry);
-	fprintf(stdout,"definition page     = %lu\n",entry->table_pg);
+	fprintf(stdout,"definition page     = %lu\n",(long)entry->table_pg);
 	fprintf(stdout,"number of datarows  = %d\n",table->num_rows);
 	fprintf(stdout,"number of columns   = %d\n",table->num_cols);
 	fprintf(stdout,"number of indices   = %d\n",table->num_real_idxs);
@@ -389,7 +389,7 @@ guint32 pgnum;
 		pgnum = mdb_get_int32(table->usage_map,1);
 		/* the first 5 bytes of the usage map mean something */
 		coln = 0;
-		for (i=5;i<table->map_sz;i++) {
+		for (i=5;i<(unsigned int)table->map_sz;i++) {
 			for (bitn=0;bitn<8;bitn++) {
 				if (table->usage_map[i] & 1 << bitn) {
 					coln++;

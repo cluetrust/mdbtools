@@ -37,6 +37,7 @@ typedef uint16_t guint16;
 typedef uint32_t guint32;
 typedef uint64_t guint64;
 typedef int32_t gint32;
+typedef int16_t gint16;
 typedef char gchar;
 typedef int gboolean;
 typedef int gint;
@@ -132,6 +133,7 @@ typedef struct GOptionContext {
 #define TRUE 1
 #define FALSE 0
 
+#define GINT16_FROM_LE(l) (int16_t)l
 #define GUINT16_FROM_LE(l) (uint16_t)l
 #define GUINT32_FROM_LE(l) (uint32_t)l
 #define GUINT64_FROM_LE(l) (uint64_t)l

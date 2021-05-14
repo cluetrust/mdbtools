@@ -132,12 +132,12 @@ static int do_carry(unsigned char *product, size_t len)
 static char *array_to_string(unsigned char *array, size_t len, unsigned int scale, int neg)
 {
 	char *s;
-	unsigned int top, i, j=0;
+    size_t top, i, j=0;
 	
-       for (top=len;(top>0) && (top-1>scale) && !array[top-1];top--);
+    for (top=len;(top>0) && (top-1>scale) && !array[top-1];top--);
 
-       /* allocate enough space for all digits + minus sign + decimal point + trailing NULL byte */
-       s = g_malloc(len+3);
+    /* allocate enough space for all digits + minus sign + decimal point + trailing NULL byte */
+    s = g_malloc(len+3);
 
 	if (neg)
 		s[j++] = '-';

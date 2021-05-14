@@ -132,8 +132,8 @@ static size_t decompressed_to_utf8_without_iconv(MdbHandle *mdb, const char *in_
  * dlen is the available size of the destination buffer.
  * Returns the length of the converted string, not including the terminator.
  */
-int
-mdb_unicode2ascii(MdbHandle *mdb, const char *src, size_t slen, char *dest, size_t dlen)
+MDBLengthType
+mdb_unicode2ascii(MdbHandle *mdb, const char *src, MDBLengthType slen, char *dest, MDBLengthType dlen)
 {
 	char *tmp = NULL;
 	size_t len_in;
@@ -153,34 +153,35 @@ mdb_unicode2ascii(MdbHandle *mdb, const char *src, size_t slen, char *dest, size
 		in_ptr = src;
 	}
 
+    size_t result_len;
 #if HAVE_ICONV
-	dlen = decompressed_to_utf8_with_iconv(mdb, in_ptr, len_in, dest, dlen);
+    result_len = decompressed_to_utf8_with_iconv(mdb, in_ptr, len_in, dest, dlen);
 #else
-	dlen = decompressed_to_utf8_without_iconv(mdb, in_ptr, len_in, dest, dlen);
+    result_len = decompressed_to_utf8_without_iconv(mdb, in_ptr, len_in, dest, dlen);
 #endif
 
 	if (tmp) g_free(tmp);
-	return dlen;
+	return (MDBLengthType)result_len;
 }
 
 /*
  * This function is used in writing text data to an MDB table.
  * If slen is 0, strlen will be used to calculate src's length.
  */
-int
-mdb_ascii2unicode(MdbHandle *mdb, const char *src, size_t slen, char *dest, size_t dlen)
+MDBLengthType
+mdb_ascii2unicode(MdbHandle *mdb, const char *src, MDBLengthType slen, char *dest, MDBLengthType dlen)
 {
-        size_t len_in, len_out;
-        const char *in_ptr = NULL;
-        char *out_ptr = NULL;
+    size_t len_in, len_out;
+    const char *in_ptr = NULL;
+    char *out_ptr = NULL;
 
 	if ((!src) || (!dest) || (!dlen))
 		return 0;
 
-        in_ptr = src;
-        out_ptr = dest;
-        len_in = (slen) ? slen : strlen(in_ptr);
-        len_out = dlen;
+    in_ptr = src;
+    out_ptr = dest;
+    len_in = (slen) ? slen : strlen(in_ptr);
+    len_out = dlen;
 
 #ifdef HAVE_ICONV
 	iconv(mdb->iconv_out, (ICONV_CONST char **)&in_ptr, &len_in, &out_ptr, &len_out);
@@ -205,7 +206,7 @@ mdb_ascii2unicode(MdbHandle *mdb, const char *src, size_t slen, char *dest, size
 	/* Unicode Compression */
 	if(!IS_JET3(mdb) && (dlen>4)) {
 		unsigned char *tmp = g_malloc(dlen);
-		unsigned int tptr = 0, dptr = 0;
+		MDBOffsetType tptr = 0, dptr = 0;
 		int comp = 1;
 
 		tmp[tptr++] = 0xff;

@@ -75,7 +75,7 @@ GPtrArray *mdb_read_catalog (MdbHandle *mdb, int objtype)
 	int type;
 	int i;
 	MdbColumn *col_props;
-	int kkd_size_ole;
+    SQLLEN kkd_size_ole;
 
 	if (!mdb) return NULL;
 	if (mdb->catalog) mdb_free_catalog(mdb);
@@ -124,6 +124,7 @@ GPtrArray *mdb_read_catalog (MdbHandle *mdb, int objtype)
         mdb_free_catalog(mdb);
         goto cleanup;
     }
+    // i is column_num in 1-based format
 	col_props = g_ptr_array_index(table->columns, i-1);
 
 	mdb_rewind_table(table);
@@ -138,17 +139,23 @@ GPtrArray *mdb_read_catalog (MdbHandle *mdb, int objtype)
 			snprintf(entry->object_name, sizeof(entry->object_name), "%s", obj_name);
 			entry->object_type = (type & 0x7F);
 			entry->table_pg = atol(obj_id) & 0x00FFFFFF;
-			entry->flags = atol(obj_flags);
+			entry->flags = atoi(obj_flags);
 			mdb->num_catalog++;
 			g_ptr_array_add(mdb->catalog, entry);
-			if (kkd_size_ole) {
-				size_t kkd_len;
-				void *kkd = mdb_ole_read_full(mdb, col_props, &kkd_len);
-				//mdb_buffer_dump(kkd, 0, kkd_len);
-				if (kkd) {
-					entry->props = mdb_kkd_to_props(mdb, kkd, kkd_len);
-					free(kkd);
-				}
+            
+            // need this to be >0, since NULL is -1
+            if (kkd_size_ole>0) {
+                // check for in-line first
+                entry->props = mdb_kkd_to_props(mdb, obj_props, (MDBLengthType)kkd_size_ole);
+                if (!entry->props) {
+                    MDBLengthType kkd_len;
+                    void *kkd = mdb_ole_read_full(mdb, col_props, &kkd_len);
+                    //mdb_buffer_dump(kkd, 0, kkd_len);
+                    if (kkd) {
+                        entry->props = mdb_kkd_to_props(mdb, kkd, kkd_len);
+                        free(kkd);
+                    }
+                }
 			}
 		}
 	}
@@ -195,7 +202,7 @@ mdb_dump_catalog(MdbHandle *mdb, int obj_type)
 			printf("Type: %-12s Name: %-48s Page: %06lx\n",
 			mdb_get_objtype_string(entry->object_type),
 			entry->object_name,
-			entry->table_pg);
+			(long)entry->table_pg);
 		}
 	}
 	return;

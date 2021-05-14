@@ -547,7 +547,7 @@ gboolean g_option_context_parse(GOptionContext *context,
             *(int *)entry->arg_data = !(entry->flags & G_OPTION_FLAG_REVERSE);
         } else if (entry->arg == G_OPTION_ARG_INT) {
             char *endptr = NULL;
-            *(int *)entry->arg_data = strtol(optarg, &endptr, 10);
+            *(int *)entry->arg_data = (int)strtol(optarg, &endptr, 10);
             if (*endptr) {
                 *error = malloc(sizeof(GError));
                 (*error)->message = malloc(100);

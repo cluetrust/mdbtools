@@ -110,7 +110,7 @@ gchar* GetConnectParam (ConnectParams* params, const gchar* paramName)
 
 void SetConnectString (ConnectParams* params, const gchar* connectString)
 {
-   int end;
+   ssize_t end;
    char *cs, *s, *p, *name, *value;
    gpointer key;
    gpointer oldvalue;
@@ -146,7 +146,7 @@ void SetConnectString (ConnectParams* params, const gchar* connectString)
        */
       end = strlen (name) - 1;
       while (end > 0 && isspace(name[end]))
-	 name[end--] = '\0';
+          name[end--] = '\0';
       /*
        * remove leading spaces from value
        */
@@ -317,4 +317,4 @@ ODBCINSTGetProperties(HODBCINSTPROPERTY hLastProperty)
 }
 
 #endif
-/** @}*/
+/** @} */

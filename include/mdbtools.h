@@ -31,6 +31,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <locale.h>
+#include <sql.h>
 
 #ifdef HAVE_GLIB
 #include <glib.h>
@@ -204,6 +205,12 @@ enum {
 
 #define IS_JET4(mdb) (mdb->f->jet_version==MDB_VER_JET4) /* obsolete */
 #define IS_JET3(mdb) (mdb->f->jet_version==MDB_VER_JET3)
+  
+typedef gint32 MDBOffsetType;
+typedef gint32 MDBLengthType;
+typedef guint16 MDBShortOffsetType;
+typedef guint16 MDBRowNumberType;
+typedef guint32 MDBPageRowType;
 
 /* forward declarations */
 typedef struct mdbindex MdbIndex;
@@ -259,33 +266,33 @@ typedef struct {
 
 /* offset to row count on data pages...version dependant */
 typedef struct {
-	ssize_t		pg_size;
-	guint16		row_count_offset; 
-	guint16		tab_num_rows_offset;
-	guint16		tab_num_cols_offset;
-	guint16		tab_num_idxs_offset;
-	guint16		tab_num_ridxs_offset;
-	guint16		tab_usage_map_offset;
-	guint16		tab_first_dpg_offset;
-	guint16		tab_cols_start_offset;
-	guint16		tab_ridx_entry_size;
-	guint16		col_flags_offset;
-	guint16		col_size_offset;
-	guint16		col_num_offset;
-	guint16		tab_col_entry_size;
-	guint16         tab_free_map_offset;
-	guint16		tab_col_offset_var;
-	guint16		tab_col_offset_fixed;
-	guint16		tab_row_col_num_offset;
-	guint16		col_scale_offset;
-	guint16		col_prec_offset;
+	MDBLengthType		pg_size;
+    MDBOffsetType		row_count_offset;
+    MDBOffsetType		tab_num_rows_offset;
+    MDBOffsetType		tab_num_cols_offset;
+    MDBOffsetType		tab_num_idxs_offset;
+    MDBOffsetType		tab_num_ridxs_offset;
+    MDBOffsetType		tab_usage_map_offset;
+    MDBOffsetType		tab_first_dpg_offset;
+    MDBOffsetType		tab_cols_start_offset;
+    MDBOffsetType		tab_ridx_entry_size;
+    MDBOffsetType		col_flags_offset;
+    MDBOffsetType		col_size_offset;
+    MDBOffsetType		col_num_offset;
+    MDBOffsetType		tab_col_entry_size;
+    MDBOffsetType         tab_free_map_offset;
+    MDBOffsetType		tab_col_offset_var;
+    MDBOffsetType		tab_col_offset_fixed;
+    MDBOffsetType		tab_row_col_num_offset;
+    MDBOffsetType		col_scale_offset;
+    MDBOffsetType		col_prec_offset;
 } MdbFormatConstants; 
 
 typedef struct {
 	MdbFile       *f;
-	guint32       cur_pg;
-	guint16       row_num;
-	unsigned int  cur_pos;
+	MDBOffsetType       cur_pg;
+    MDBRowNumberType       row_num;
+    MDBOffsetType  cur_pos;
 	unsigned char pg_buf[MDB_PGSIZE];
 	unsigned char alt_pg_buf[MDB_PGSIZE];
 	MdbFormatConstants *fmt;
@@ -318,7 +325,7 @@ typedef struct {
 	MdbHandle	*mdb;
 	char           object_name[MDB_MAX_OBJ_NAME+1];
 	int            object_type;
-	unsigned long  table_pg; /* misnomer since object may not be a table */
+    MDBOffsetType  table_pg; /* misnomer since object may not be a table */
 	//int			num_props; please use props->len
 	GPtrArray		*props; /* GPtrArray of MdbProperties */
 	int		flags;
@@ -340,9 +347,11 @@ typedef struct {
 	struct S_MdbTableDef *table;
 	char		name[MDB_MAX_OBJ_NAME+1];
 	int		col_type;
-	int		col_size;
+	MDBLengthType		col_size;
 	void	*bind_ptr;
-	int		*len_ptr;
+    SQLLEN		*len_ptr;
+//    SQLSMALLINT    bind_type;
+//    SQLLEN        bind_len;
 	GHashTable	*properties;
 	unsigned int	num_sargs;
 	GPtrArray	*sargs;
@@ -355,7 +364,7 @@ typedef struct {
 	int		cur_value_start;
 	int 		cur_value_len;
 	/* MEMO/OLE readers */
-	guint32		cur_blob_pg_row;
+    MDBPageRowType		cur_blob_pg_row;
 	int		chunk_size;
 	/* numerics only */
 	int		col_prec;
@@ -382,12 +391,12 @@ struct mdbsargtree {
 };
 
 typedef struct {
-	guint32 pg;
-	int start_pos;
-	int offset;
-	int len;
+    MDBOffsetType pg;
+    MDBOffsetType start_pos;
+    MDBOffsetType offset;
+    MDBLengthType len;
 	int rc;
-	guint16 idx_starts[2000];	
+	MDBShortOffsetType idx_starts[2000];
 	unsigned char cache_value[256];
 } MdbIndexPage;
 
@@ -412,18 +421,18 @@ typedef struct S_MdbTableDef {
 	unsigned int    num_real_idxs;
 	unsigned int    num_idxs;
 	GPtrArray	*indices;
-	guint32	first_data_pg;
-	guint32	cur_pg_num;
-	guint32	cur_phys_pg;
+    MDBOffsetType	first_data_pg;
+    MDBOffsetType	cur_pg_num;
+    MDBOffsetType	cur_phys_pg;
 	unsigned int    cur_row;
 	int  noskip_del;  /* don't skip deleted rows */
 	/* object allocation map */
-	guint32  map_base_pg;
-	size_t map_sz;
+    MDBOffsetType  map_base_pg;
+    MDBLengthType map_sz;
 	unsigned char *usage_map;
 	/* pages with free space left */
-	guint32  freemap_base_pg;
-	size_t freemap_sz;
+    MDBOffsetType  freemap_base_pg;
+    MDBLengthType freemap_sz;
 	unsigned char *free_usage_map;
 	/* query planner */
 	MdbSargNode *sarg_tree;
@@ -442,8 +451,8 @@ struct mdbindex {
 	int		index_num;
 	char		name[MDB_MAX_OBJ_NAME+1];
 	unsigned char	index_type;
-	guint32		first_pg;
-	int		num_rows;  /* number rows in index */
+	MDBOffsetType		first_pg;
+	MDBRowNumberType		num_rows;  /* number rows in index */
 	unsigned int	num_keys;
 	short	key_col_num[MDB_MAX_IDX_COLS];
 	unsigned char	key_col_order[MDB_MAX_IDX_COLS];
@@ -457,12 +466,12 @@ typedef struct {
 
 typedef struct {
 	void *value;
-	int siz;
-	int start;
+    MDBLengthType siz;
+    MDBOffsetType start;
 	unsigned char is_null;
 	unsigned char is_fixed;
 	int colnum;
-	int offset;
+    MDBOffsetType offset;
 } MdbField;
 
 typedef struct {
@@ -474,19 +483,19 @@ typedef struct {
 const char *mdb_get_version(void);
 
 /* file.c */
-ssize_t mdb_read_pg(MdbHandle *mdb, unsigned long pg);
-ssize_t mdb_read_alt_pg(MdbHandle *mdb, unsigned long pg);
-unsigned char mdb_get_byte(void *buf, int offset);
-int    mdb_get_int16(void *buf, int offset);
-long   mdb_get_int32(void *buf, int offset);
-long   mdb_get_int32_msb(void *buf, int offset);
-float  mdb_get_single(void *buf, int offset);
-double mdb_get_double(void *buf, int offset);
-unsigned char mdb_pg_get_byte(MdbHandle *mdb, int offset);
-int    mdb_pg_get_int16(MdbHandle *mdb, int offset);
-long   mdb_pg_get_int32(MdbHandle *mdb, int offset);
-float  mdb_pg_get_single(MdbHandle *mdb, int offset);
-double mdb_pg_get_double(MdbHandle *mdb, int offset);
+MDBLengthType mdb_read_pg(MdbHandle *mdb, MDBOffsetType pg);
+MDBLengthType mdb_read_alt_pg(MdbHandle *mdb, MDBOffsetType pg);
+unsigned char mdb_get_byte(void *buf, MDBOffsetType offset);
+gint16  mdb_get_int16(void *buf, MDBOffsetType offset);
+gint32  mdb_get_int32(void *buf, MDBOffsetType offset);
+gint32  mdb_get_int32_msb(void *buf, MDBOffsetType offset);
+float  mdb_get_single(void *buf, MDBOffsetType offset);
+double mdb_get_double(void *buf, MDBOffsetType offset);
+unsigned char mdb_pg_get_byte(MdbHandle *mdb, MDBOffsetType offset);
+gint16    mdb_pg_get_int16(MdbHandle *mdb, MDBOffsetType offset);
+gint32   mdb_pg_get_int32(MdbHandle *mdb, MDBOffsetType offset);
+float  mdb_pg_get_single(MdbHandle *mdb, MDBOffsetType offset);
+double mdb_pg_get_double(MdbHandle *mdb, MDBOffsetType offset);
 MdbHandle *mdb_open(const char *filename, MdbFileFlags flags);
 MdbHandle *mdb_open_buffer(void *buffer, size_t len, MdbFileFlags flags);
 void mdb_close(MdbHandle *mdb);
@@ -509,10 +518,10 @@ void mdb_append_column(GPtrArray *columns, MdbColumn *in_col);
 void mdb_free_columns(GPtrArray *columns);
 GPtrArray *mdb_read_columns(MdbTableDef *table);
 void mdb_table_dump(MdbCatalogEntry *entry);
-guint8 read_pg_if_8(MdbHandle *mdb, int *cur_pos);
-guint16 read_pg_if_16(MdbHandle *mdb, int *cur_pos);
-guint32 read_pg_if_32(MdbHandle *mdb, int *cur_pos);
-void *read_pg_if_n(MdbHandle *mdb, void *buf, int *cur_pos, size_t len);
+guint8 read_pg_if_8(MdbHandle *mdb, MDBOffsetType *cur_pos);
+guint16 read_pg_if_16(MdbHandle *mdb, MDBOffsetType *cur_pos);
+guint32 read_pg_if_32(MdbHandle *mdb, MDBOffsetType *cur_pos);
+void *read_pg_if_n(MdbHandle *mdb, void *buf, MDBOffsetType *cur_pos, MDBLengthType len);
 int mdb_is_user_table(MdbCatalogEntry *entry);
 int mdb_is_system_table(MdbCatalogEntry *entry);
 const char *mdb_table_get_prop(const MdbTableDef *table, const gchar *key);
@@ -520,32 +529,32 @@ const char *mdb_col_get_prop(const MdbColumn *col, const gchar *key);
 int mdb_col_is_shortdate(const MdbColumn *col);
 
 /* data.c */
-int mdb_bind_column_by_name(MdbTableDef *table, gchar *col_name, void *bind_ptr, int *len_ptr);
+int mdb_bind_column_by_name(MdbTableDef *table, gchar *col_name, void *bind_ptr, SQLLEN *len_ptr);
 void mdb_data_dump(MdbTableDef *table);
 void mdb_date_to_tm(double td, struct tm *t);
 void mdb_tm_to_date(struct tm *t, double *td);
 char *mdb_uuid_to_string(const void *buf, int start);
-int mdb_bind_column(MdbTableDef *table, int col_num, void *bind_ptr, int *len_ptr);
+int mdb_bind_column(MdbTableDef *table, int col_num, void *bind_ptr, SQLLEN *len_ptr);
 int mdb_rewind_table(MdbTableDef *table);
 int mdb_fetch_row(MdbTableDef *table);
 int mdb_is_fixed_col(MdbColumn *col);
 char *mdb_col_to_string(MdbHandle *mdb, void *buf, int start, int datatype, int size);
-int mdb_find_pg_row(MdbHandle *mdb, int pg_row, void **buf, int *off, size_t *len);
-int mdb_find_row(MdbHandle *mdb, int row, int *start, size_t *len);
-int mdb_find_end_of_row(MdbHandle *mdb, int row);
+int mdb_find_pg_row(MdbHandle *mdb, MDBPageRowType pg_row, void **buf, MDBOffsetType *off, MDBLengthType *len);
+int mdb_find_row(MdbHandle *mdb, MDBRowNumberType row, MDBOffsetType *start, MDBLengthType *len);
+int mdb_find_end_of_row(MdbHandle *mdb, MDBRowNumberType row);
 int mdb_col_fixed_size(MdbColumn *col);
 int mdb_col_disp_size(MdbColumn *col);
-size_t mdb_ole_read_next(MdbHandle *mdb, MdbColumn *col, void *ole_ptr);
-size_t mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, size_t chunk_size);
-void* mdb_ole_read_full(MdbHandle *mdb, MdbColumn *col, size_t *size);
-void mdb_set_bind_size(MdbHandle *mdb, size_t bind_size);
+MDBLengthType mdb_ole_read_next(MdbHandle *mdb, MdbColumn *col, void *ole_ptr);
+MDBLengthType mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, MDBLengthType chunk_size);
+void* mdb_ole_read_full(MdbHandle *mdb, MdbColumn *col, MDBLengthType *size);
+void mdb_set_bind_size(MdbHandle *mdb, MDBRowNumberType bind_size);
 void mdb_set_date_fmt(MdbHandle *mdb, const char *);
 void mdb_set_shortdate_fmt(MdbHandle *mdb, const char *);
 void mdb_set_boolean_fmt_words(MdbHandle *mdb);
 void mdb_set_boolean_fmt_numbers(MdbHandle *mdb);
-int mdb_read_row(MdbTableDef *table, unsigned int row);
+int mdb_read_row(MdbTableDef *table, MDBRowNumberType row);
 #ifdef MDB_COPY_OLE
-size_t mdb_copy_ole(MdbHandle *mdb, void *dest, int start, int size);
+MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBRowNumberType size);
 #endif
 
 /* money.c */
@@ -592,11 +601,11 @@ GPtrArray *mdb_read_indices(MdbTableDef *table);
 void mdb_index_dump(MdbTableDef *table, MdbIndex *idx);
 void mdb_index_scan_free(MdbTableDef *table);
 int mdb_index_find_next_on_page(MdbHandle *mdb, MdbIndexPage *ipg);
-int mdb_index_find_next(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, guint32 *pg, guint16 *row);
+int mdb_index_find_next(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, MDBOffsetType *pg, MDBRowNumberType *row);
 void mdb_index_hash_text(MdbHandle *mdb, char *text, char *hash);
 void mdb_index_scan_init(MdbHandle *mdb, MdbTableDef *table);
-int mdb_index_find_row(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, guint32 pg, guint16 row);
-void mdb_index_swap_n(unsigned char *src, int sz, unsigned char *dest);
+int mdb_index_find_row(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, MDBOffsetType pg, MDBRowNumberType row);
+void mdb_index_swap_n(unsigned char *src, MDBLengthType sz, unsigned char *dest);
 void mdb_free_indices(GPtrArray *indices);
 void mdb_index_page_reset(MdbHandle *mdb, MdbIndexPage *ipg);
 int mdb_index_pack_bitmap(MdbHandle *mdb, MdbIndexPage *ipg);
@@ -610,34 +619,35 @@ void mdb_dump_stats(MdbHandle *mdb);
 int mdb_like_cmp(char *s, char *r);
 
 /* write.c */
-void mdb_put_int16(void *buf, guint32 offset, guint32 value);
-void mdb_put_int32(void *buf, guint32 offset, guint32 value);
-void mdb_put_int32_msb(void *buf, guint32 offset, guint32 value);
-int mdb_crack_row(MdbTableDef *table, int row_start, size_t row_size, MdbField *fields);
-guint16 mdb_add_row_to_pg(MdbTableDef *table, unsigned char *row_buffer, int new_row_size);
-int mdb_update_index(MdbTableDef *table, MdbIndex *idx, unsigned int num_fields, MdbField *fields, guint32 pgnum, guint16 rownum);
+void mdb_put_int16(void *buf, MDBOffsetType offset, guint32 value);
+void mdb_put_int32(void *buf, MDBOffsetType offset, guint32 value);
+void mdb_put_uint32(void *buf, MDBOffsetType offset, guint32 value);
+void mdb_put_int32_msb(void *buf, MDBOffsetType offset, guint32 value);
+int mdb_crack_row(MdbTableDef *table, MDBOffsetType row_start, MDBLengthType row_size, MdbField *fields);
+guint16 mdb_add_row_to_pg(MdbTableDef *table, unsigned char *row_buffer, MDBLengthType new_row_size);
+int mdb_update_index(MdbTableDef *table, MdbIndex *idx, unsigned int num_fields, MdbField *fields, MDBOffsetType pgnum, MDBRowNumberType rownum);
 int mdb_insert_row(MdbTableDef *table, int num_fields, MdbField *fields);
 int mdb_pack_row(MdbTableDef *table, unsigned char *row_buffer, unsigned int num_fields, MdbField *fields);
-int mdb_replace_row(MdbTableDef *table, int row, void *new_row, int new_row_size);
+int mdb_replace_row(MdbTableDef *table, MDBRowNumberType row, void *new_row, MDBLengthType new_row_size);
 int mdb_pg_get_freespace(MdbHandle *mdb);
 int mdb_update_row(MdbTableDef *table);
 void *mdb_new_data_pg(MdbCatalogEntry *entry);
 
 /* map.c */
-gint32 mdb_map_find_next_freepage(MdbTableDef *table, int row_size);
-gint32 mdb_map_find_next(MdbHandle *mdb, unsigned char *map, unsigned int map_sz, guint32 start_pg);
+MDBLengthType mdb_map_find_next_freepage(MdbTableDef *table, MDBLengthType row_size);
+MDBLengthType mdb_map_find_next(MdbHandle *mdb, unsigned char *map, MDBLengthType map_sz, MDBOffsetType start_pg);
 
 /* props.c */
 void mdb_free_props(MdbProperties *props);
 void mdb_dump_props(MdbProperties *props, FILE *outfile, int show_name);
-GPtrArray* mdb_kkd_to_props(MdbHandle *mdb, void *kkd, size_t len);
+GPtrArray* mdb_kkd_to_props(MdbHandle *mdb, void *kkd, MDBLengthType len);
 
 
 /* worktable.c */
 MdbTableDef *mdb_create_temp_table(MdbHandle *mdb, char *name);
 void mdb_temp_table_add_col(MdbTableDef *table, MdbColumn *col);
-void mdb_fill_temp_col(MdbColumn *tcol, char *col_name, int col_size, int col_type, int is_fixed);
-void mdb_fill_temp_field(MdbField *field, void *value, int siz, int is_fixed, int is_null, int start, int column);
+void mdb_fill_temp_col(MdbColumn *tcol, char *col_name, MDBLengthType col_size, int col_type, int is_fixed);
+void mdb_fill_temp_field(MdbField *field, void *value, MDBLengthType siz, int is_fixed, int is_null, int start, int column);
 void mdb_temp_columns_end(MdbTableDef *table);
 
 /* options.c */
@@ -645,8 +655,8 @@ int mdb_get_option(unsigned long optnum);
 void mdb_debug(int klass, char *fmt, ...);
 
 /* iconv.c */
-int mdb_unicode2ascii(MdbHandle *mdb, const char *src, size_t slen, char *dest, size_t dlen);
-int mdb_ascii2unicode(MdbHandle *mdb, const char *src, size_t slen, char *dest, size_t dlen);
+MDBLengthType mdb_unicode2ascii(MdbHandle *mdb, const char *src, MDBLengthType slen, char *dest, MDBLengthType dlen);
+MDBLengthType mdb_ascii2unicode(MdbHandle *mdb, const char *src, MDBLengthType slen, char *dest, MDBLengthType dlen);
 void mdb_iconv_init(MdbHandle *mdb);
 void mdb_iconv_close(MdbHandle *mdb);
 const char* mdb_target_charset(MdbHandle *mdb);

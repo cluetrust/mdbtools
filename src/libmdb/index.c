@@ -381,7 +381,8 @@ mdb_read_indices(MdbTableDef *table)
 void
 mdb_index_hash_text(MdbHandle *mdb, char *text, char *hash)
 {
-	unsigned int k, len=strlen(text);
+    unsigned int k;
+    size_t len=strlen(text);
 	char *transtbl=NULL;
 
 	if (!IS_JET3(mdb))
@@ -499,7 +500,7 @@ mdb_index_test_sargs(MdbHandle *mdb, MdbIndex *idx, char *buf, int len)
 	MdbField field;
 	MdbSargNode node;
 	//int c_offset = 0, 
-	int c_len;
+	MDBLengthType c_len;
 
 	//fprintf(stderr,"mdb_index_test_sargs called on ");
 	//mdb_buffer_dump(buf, 0, len);
@@ -512,7 +513,7 @@ mdb_index_test_sargs(MdbHandle *mdb, MdbIndex *idx, char *buf, int len)
 		 */
 		if (col->col_type==MDB_TEXT) {
 			//c_len = strlen(&mdb->pg_buf[offset + c_offset]);
-			c_len = strlen(buf);
+			c_len = (MDBLengthType)strlen(buf);
 		} else {
 			c_len = col->col_size;
 			//fprintf(stderr,"Only text types currently supported.  How did we get here?\n");
@@ -539,8 +540,8 @@ mdb_index_test_sargs(MdbHandle *mdb, MdbIndex *idx, char *buf, int len)
 			node.value = sarg->value;
 			//field.value = &mdb->pg_buf[offset + c_offset];
 			field.value = buf;
-		       	field.siz = c_len;
-		       	field.is_null = FALSE;
+		    field.siz = c_len;
+		    field.is_null = FALSE;
 			/* In Jet 4 Index text hashes don't need to be converted from Unicode */
 			if (!IS_JET3(mdb) && col->col_type == MDB_TEXT)
 			{
@@ -809,7 +810,7 @@ mdb_index_unwind(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain)
  * columns with sarg values can't be tested here.
  */
 int
-mdb_index_find_next(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, guint32 *pg, guint16 *row)
+mdb_index_find_next(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, MDBOffsetType *pg, MDBRowNumberType *row)
 {
 	MdbIndexPage *ipg;
 	int passed = 0;
@@ -892,7 +893,7 @@ mdb_index_find_next(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, guint32
  * getting it working first and then make it fast!
  */
 int 
-mdb_index_find_row(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, guint32 pg, guint16 row)
+mdb_index_find_row(MdbHandle *mdb, MdbIndex *idx, MdbIndexChain *chain, MDBOffsetType pg, MDBRowNumberType row)
 {
 	MdbIndexPage *ipg;
 	int passed = 0;

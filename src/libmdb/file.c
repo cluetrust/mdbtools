@@ -75,7 +75,7 @@ typedef struct _RC4_KEY
 
 #define swap_byte(x,y) t = *(x); *(x) = *(y); *(y) = t
 
-static ssize_t _mdb_read_pg(MdbHandle *mdb, void *pg_buf, unsigned long pg);
+static MDBLengthType _mdb_read_pg(MdbHandle *mdb, void *pg_buf, MDBOffsetType pg);
 
 static void RC4_set_key(RC4_KEY *key, int key_data_len, unsigned char *key_data_ptr)
 {
@@ -233,7 +233,7 @@ static MdbHandle *mdb_handle_from_stream(FILE *stream, MdbFileFlags flags) {
 	}
 
     RC4_KEY rc4_key;
-    unsigned int tmp_key = 0x6b39dac7;
+    guint32 tmp_key = 0x6b39dac7;
     RC4_set_key(&rc4_key, 4, (unsigned char *)&tmp_key);
     RC4(&rc4_key, mdb->f->jet_version == MDB_VER_JET3 ? 126 : 128, mdb->pg_buf + 0x18);
 
@@ -387,9 +387,9 @@ MdbHandle *mdb_clone_handle(MdbHandle *mdb)
 /* 
 ** mdb_read a wrapper for read that bails if anything is wrong 
 */
-ssize_t mdb_read_pg(MdbHandle *mdb, unsigned long pg)
+MDBLengthType mdb_read_pg(MdbHandle *mdb, MDBOffsetType pg)
 {
-	ssize_t len;
+	MDBLengthType len;
 
 	if (pg && mdb->cur_pg == pg) return mdb->fmt->pg_size;
 
@@ -400,11 +400,11 @@ ssize_t mdb_read_pg(MdbHandle *mdb, unsigned long pg)
 	mdb->cur_pos = 0; /* kan */
 	return len;
 }
-ssize_t mdb_read_alt_pg(MdbHandle *mdb, unsigned long pg)
+MDBLengthType mdb_read_alt_pg(MdbHandle *mdb, MDBOffsetType pg)
 {
 	return _mdb_read_pg(mdb, mdb->alt_pg_buf, pg);
 }
-static ssize_t _mdb_read_pg(MdbHandle *mdb, void *pg_buf, unsigned long pg)
+static MDBLengthType _mdb_read_pg(MdbHandle *mdb, void *pg_buf, MDBOffsetType pg)
 {
 	ssize_t len;
 	off_t offset = pg * mdb->fmt->pg_size;
@@ -421,7 +421,7 @@ static ssize_t _mdb_read_pg(MdbHandle *mdb, void *pg_buf, unsigned long pg)
 		mdb->stats->pg_reads++;
 
 	if (fseeko(mdb->f->stream, offset, SEEK_SET) == -1) {
-        fprintf(stderr, "Unable to seek to page %lu\n", pg);
+        fprintf(stderr, "Unable to seek to page %lu\n", (unsigned long)pg);
         return 0;
     }
 	len = fread(pg_buf, 1, mdb->fmt->pg_size, mdb->f->stream);
@@ -437,12 +437,12 @@ static ssize_t _mdb_read_pg(MdbHandle *mdb, void *pg_buf, unsigned long pg)
 	if (pg != 0 && mdb->f->db_key != 0)
 	{
 		RC4_KEY rc4_key;
-		unsigned int tmp_key = mdb->f->db_key ^ pg;
+		guint32 tmp_key = mdb->f->db_key ^ pg;
 		RC4_set_key(&rc4_key, 4, (unsigned char *)&tmp_key);
 		RC4(&rc4_key, mdb->fmt->pg_size, pg_buf);
 	}
 
-	return mdb->fmt->pg_size;
+	return (MDBLengthType) len;
 }
 void mdb_swap_pgbuf(MdbHandle *mdb)
 {
@@ -465,32 +465,40 @@ unsigned char mdb_pg_get_byte(MdbHandle *mdb, int offset)
 	return mdb->pg_buf[offset];
 }
 
-int mdb_get_int16(void *buf, int offset)
+gint16 mdb_get_int16(void *buf, int offset)
 {
 	guint16 l;
 	memcpy(&l, (char*)buf + offset, 2);
-	return (int)GUINT16_FROM_LE(l);
+	return (int)GINT16_FROM_LE(l);
 }
-int mdb_pg_get_int16(MdbHandle *mdb, int offset)
+
+guint16 mdb_get_uint16(void *buf, int offset)
+{
+    guint16 l;
+    memcpy(&l, (char*)buf + offset, 2);
+    return (int)GUINT16_FROM_LE(l);
+}
+
+gint16 mdb_pg_get_int16(MdbHandle *mdb, int offset)
 {
 	if (offset < 0 || offset+2 > mdb->fmt->pg_size) return -1;
 	mdb->cur_pos+=2;
 	return mdb_get_int16(mdb->pg_buf, offset);
 }
 
-long mdb_get_int32_msb(void *buf, int offset)
+gint32 mdb_get_int32_msb(void *buf, int offset)
 {
 	gint32 l;
 	memcpy(&l, (char*)buf + offset, 4);
-	return (long)GINT32_FROM_BE(l);
+	return GINT32_FROM_BE(l);
 }
-long mdb_get_int32(void *buf, int offset)
+gint32 mdb_get_int32(void *buf, int offset)
 {
 	gint32 l;
 	memcpy(&l, (char*)buf + offset, 4);
-	return (long)GINT32_FROM_LE(l);
+	return GINT32_FROM_LE(l);
 }
-long mdb_pg_get_int32(MdbHandle *mdb, int offset)
+gint32 mdb_pg_get_int32(MdbHandle *mdb, int offset)
 {
 	if (offset <0 || offset+4 > mdb->fmt->pg_size) return -1;
 	mdb->cur_pos+=4;

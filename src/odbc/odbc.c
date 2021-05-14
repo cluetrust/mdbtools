@@ -724,7 +724,7 @@ SQLRETURN SQL_API SQLDescribeCol(
     SQLSMALLINT       *pibScale,
     SQLSMALLINT       *pfNullable)
 {
-	int i;
+	unsigned int i;
 	struct _hstmt *stmt = (struct _hstmt *) hstmt;
 	MdbSQL *sql = stmt->sql;
 	MdbSQLColumn *sqlcol;
@@ -816,7 +816,7 @@ SQLRETURN SQL_API SQLColAttributes(
     SQLSMALLINT       *pcbDesc,
     SQLLEN            *pfDesc)
 {
-	int i;
+	unsigned int i;
 	struct _hstmt *stmt;
 	MdbSQL *sql;
 	MdbSQLColumn *sqlcol;
@@ -1352,7 +1352,7 @@ SQLRETURN SQL_API SQLColumns(
 	MdbCatalogEntry *entry;
 	MdbTableDef *table;
 	MdbColumn *col;
-	unsigned int ts2, ts3, ts5;
+	MDBLengthType ts2, ts3, ts5;
 	unsigned char t2[MDB_BIND_SIZE],
 	              t3[MDB_BIND_SIZE],
 	              t5[MDB_BIND_SIZE];
@@ -1417,9 +1417,9 @@ SQLRETURN SQL_API SQLColumns(
             if (szColumnName && (strcasecmp((char*)szColumnName, col->name)!=0))
                 continue;
 
-			ts2 = mdb_ascii2unicode(mdb, table->name, 0, (char*)t2, sizeof(t2));
-			ts3 = mdb_ascii2unicode(mdb, col->name, 0, (char*)t3, sizeof(t3));
-			ts5 = mdb_ascii2unicode(mdb, _odbc_get_client_type_name(col), 0,  (char*)t5, sizeof(t5));
+			ts2 = (MDBLengthType)mdb_ascii2unicode(mdb, table->name, 0, (char*)t2, sizeof(t2));
+			ts3 = (MDBLengthType)mdb_ascii2unicode(mdb, col->name, 0, (char*)t3, sizeof(t3));
+			ts5 = (MDBLengthType)mdb_ascii2unicode(mdb, _odbc_get_client_type_name(col), 0,  (char*)t5, sizeof(t5));
 
 			nullable = SQL_NO_NULLS;
 			datatype = _odbc_get_client_type(col);
@@ -1498,7 +1498,8 @@ SQLRETURN SQL_API SQLGetData(
 	MdbSQLColumn *sqlcol;
 	MdbColumn *col=NULL;
 	MdbTableDef *table;
-	int i, intValue;
+    unsigned int i;
+    int intValue;
 
 	TRACE("SQLGetData");
 	stmt = (struct _hstmt *) hstmt;
@@ -1860,9 +1861,9 @@ SQLRETURN SQL_API SQLGetData(
 				str = mdb_col_to_string(mdb, mdb->pg_buf,
 						col->cur_value_start, col->col_type, col->cur_value_len);
 			}
-            size_t len=0;
+            SQLLEN len=0;
             if (str)
-                len = strlen(str);
+                len = (SQLLEN)strlen(str);
             
             if (col->col_type != MDB_MEMO) {
                 // all other types are required to be governed by the length the user asked for
@@ -2895,7 +2896,7 @@ static int _odbc_get_string_size(int size, SQLCHAR *str)
 		return 0;
 	}
 	if (size==SQL_NTS) {
-		return strlen((char*)str);
+		return (int)strlen((char*)str);
 	} else {
 		return size;
 	}

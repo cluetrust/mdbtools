@@ -85,8 +85,8 @@ mdb_map_find_next1(MdbHandle *mdb, unsigned char *map, unsigned int map_sz, guin
 
 /* returns 0 on EOF */
 /* returns -1 on error (unsupported map type) */
-gint32
-mdb_map_find_next(MdbHandle *mdb, unsigned char *map, unsigned int map_sz, guint32 start_pg)
+MDBOffsetType
+mdb_map_find_next(MdbHandle *mdb, unsigned char *map, MDBLengthType map_sz, MDBOffsetType start_pg)
 {
 	if (map[0] == 0) {
 		return mdb_map_find_next0(mdb, map, map_sz, start_pg);
@@ -97,19 +97,19 @@ mdb_map_find_next(MdbHandle *mdb, unsigned char *map, unsigned int map_sz, guint
 	fprintf(stderr, "Warning: unrecognized usage map type: %d\n", map[0]);
 	return -1;
 }
-gint32
+MDBOffsetType
 mdb_alloc_page(MdbTableDef *table)
 {
 	printf("Allocating new page\n");
 	return 0;
 }
-gint32
-mdb_map_find_next_freepage(MdbTableDef *table, int row_size)
+MDBOffsetType 
+mdb_map_find_next_freepage(MdbTableDef *table, MDBLengthType row_size)
 {
 	MdbCatalogEntry *entry = table->entry;
 	MdbHandle *mdb = entry->mdb;
-	gint32 pgnum;
-	guint32 cur_pg = 0;
+	MDBOffsetType pgnum;
+	MDBOffsetType cur_pg = 0;
 	int free_space;
 
 	do {

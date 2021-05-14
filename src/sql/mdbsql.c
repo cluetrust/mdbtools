@@ -126,7 +126,7 @@ void mdb_sql_set_maxrow(MdbSQL *sql, int maxrow)
 
 static void mdb_sql_free_columns(GPtrArray *columns)
 {
-	int i;
+	unsigned int i;
 	if (!columns) return;
 	for (i=0; i<columns->len; i++) {
 		MdbSQLColumn *c = (MdbSQLColumn *)g_ptr_array_index(columns, i);
@@ -137,7 +137,7 @@ static void mdb_sql_free_columns(GPtrArray *columns)
 }
 static void mdb_sql_free_tables(GPtrArray *tables)
 {
-	int i;
+    unsigned int i;
 	if (!tables) return;
 	for (i=0; i<tables->len; i++) {
 		MdbSQLTable *t = (MdbSQLTable *)g_ptr_array_index(tables, i);
@@ -562,7 +562,7 @@ void mdb_sql_reset(MdbSQL *sql)
 }
 static void print_break(int sz, int first)
 {
-int i;
+    int i;
 	if (first) {
 		fprintf(stdout,"+");
 	}
@@ -573,13 +573,13 @@ int i;
 }
 static void print_value(char *v, int sz, int first)
 {
-int i;
-int vlen;
+    int i;
+    int vlen;
 
 	if (first) {
 		fprintf(stdout,"|");
 	}
-	vlen = strlen(v);
+	vlen = (int)strlen(v);
 	for (i=0;i<sz;i++) {
 		fprintf(stdout,"%c",i >= vlen ? ' ' : v[i]);
 	}
@@ -850,11 +850,11 @@ int found = 0;
 }
 
 int
-mdb_sql_bind_column(MdbSQL *sql, int colnum, void *varaddr, int *len_ptr)
+mdb_sql_bind_column(MdbSQL *sql, int colnum, void *varaddr, SQLLEN *len_ptr)
 {
 	MdbSQLColumn *sqlcol;
 
-	if (colnum <= 0 || colnum > sql->num_columns)
+	if (colnum <= 0 || colnum > (int)sql->num_columns)
 		return -1;
 
 	/* sql columns are traditionally 1 based, so decrement colnum */
