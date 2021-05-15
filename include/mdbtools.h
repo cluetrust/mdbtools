@@ -36,7 +36,7 @@
 #ifdef HAVE_GLIB
 #include <glib.h>
 #else
-#include <mdbfakeglib.h>
+#include "mdbfakeglib.h"
 #endif
 
 #if defined(HAVE_ICONV)
