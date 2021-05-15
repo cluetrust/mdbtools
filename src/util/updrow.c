@@ -31,7 +31,7 @@ int colnum;
 char *sargname = NULL;
 char *updstr = NULL;
 char data[255];
-int len;
+SQLLEN len;
 
 
 	if (argc<4) {

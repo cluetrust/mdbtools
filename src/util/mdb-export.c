@@ -34,7 +34,7 @@ main(int argc, char **argv)
 	MdbTableDef *table;
 	MdbColumn *col;
 	char **bound_values;
-	int  *bound_lens;
+	SQLLEN  *bound_lens;
 	FILE *outfile = stdout;
 	char *delimiter = NULL;
 	char *row_delimiter = NULL;
@@ -54,7 +54,7 @@ main(int argc, char **argv)
 	int export_flags = 0;
 	int bin_mode = 0;
 	char *value;
-	size_t length;
+	MDBLengthType length;
 	int ret;
 	char *locale = NULL;
 	char *table_name = NULL;

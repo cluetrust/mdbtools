@@ -547,7 +547,7 @@ int mdb_col_disp_size(MdbColumn *col);
 MDBLengthType mdb_ole_read_next(MdbHandle *mdb, MdbColumn *col, void *ole_ptr);
 MDBLengthType mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, MDBLengthType chunk_size);
 void* mdb_ole_read_full(MdbHandle *mdb, MdbColumn *col, MDBLengthType *size);
-void mdb_set_bind_size(MdbHandle *mdb, MDBRowNumberType bind_size);
+void mdb_set_bind_size(MdbHandle *mdb, MDBLengthType bind_size);
 void mdb_set_date_fmt(MdbHandle *mdb, const char *);
 void mdb_set_shortdate_fmt(MdbHandle *mdb, const char *);
 void mdb_set_boolean_fmt_words(MdbHandle *mdb);

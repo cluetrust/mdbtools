@@ -77,7 +77,7 @@ void check_row(MdbHandle *mdb, MdbIndex *idx, guint32 pg, int row)
 	MdbField fields[256];
 	unsigned int num_fields, i, j;
 	int row_start;
-	size_t row_size;
+    MDBLengthType row_size;
 	MdbColumn *col;
 	gchar buf[256], key[256];
 	int elem;
@@ -115,7 +115,7 @@ void check_row(MdbHandle *mdb, MdbIndex *idx, guint32 pg, int row)
 void
 walk_index(MdbHandle *mdb, MdbIndex *idx)
 {
-	guint32 pg;
+    MDBOffsetType pg;
 	guint16 row;
 	MdbHandle *mdbidx;
 	MdbIndexChain chain;

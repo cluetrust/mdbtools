@@ -107,12 +107,12 @@ main(int argc, char **argv)
 	MdbTableDef *table;
 	MdbColumn *col;
 	char **bound_values;
-	int  *bound_lens;
+	SQLLEN  *bound_lens;
 	FILE *outfile = stdout;
 	char *date_fmt = NULL;
 	char *shortdate_fmt = NULL;
 	char *value;
-	size_t length;
+	MDBLengthType length;
 	int ret;
 	char *table_name = NULL;
 	char *locale = NULL;

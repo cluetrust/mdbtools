@@ -54,7 +54,7 @@ static const char boolean_true_number[]  = "1";
 static const char boolean_false_word[]   = "FALSE";
 static const char boolean_true_word[]    = "TRUE";
 
-void mdb_set_bind_size(MdbHandle *mdb, MDBRowNumberType bind_size) {
+void mdb_set_bind_size(MdbHandle *mdb, MDBLengthType bind_size) {
     mdb->bind_size = bind_size;
 }
 
