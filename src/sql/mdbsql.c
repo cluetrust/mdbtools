@@ -111,10 +111,10 @@ mdb_sql_run_query (MdbSQL* sql, const gchar* querystr) {
 		return NULL;
 	}
 
-	if (mdb_sql_bind_all(sql) == -1) {
-		mdb_sql_error (sql, _("Failed to bind columns for '%s' command"), querystr);
-		return NULL;
-	}
+//	if (mdb_sql_bind_all(sql) == -1) {
+//		mdb_sql_error (sql, _("Failed to bind columns for '%s' command"), querystr);
+//		return NULL;
+//	}
 
 	return sql;
 }

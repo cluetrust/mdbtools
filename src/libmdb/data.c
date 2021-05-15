@@ -733,6 +733,8 @@ MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBL
 		int cur = 0;
 		pg_row = mdb_get_int32(pg_buf, start+4);
 		do {
+            // TODO: no length check in here (or anywhere that BIND is used)
+            // TODO: Why is bind_ptr used when there's no binding.
 			mdb_debug(MDB_DEBUG_OLE,"Reading LVAL page %06x",
 				pg_row >> 8);
 
