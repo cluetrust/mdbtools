@@ -55,3 +55,5 @@ public/
 .sass-cache/
 temp-man-pages/
 
+## tests
+test
