@@ -616,7 +616,7 @@ mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, MDBLengthType chunk_
 					MDB_MEMO_OVERHEAD], len);
 		return len;
 	} else if (ole_len & 0x40000000) {
-		col->cur_blob_pg_row = mdb_get_int32(ole_ptr, 4);
+		col->cur_blob_pg_row = mdb_get_uint32(ole_ptr, 4);
 		mdb_debug(MDB_DEBUG_OLE,"ole row = %d ole pg = %ld",
 			col->cur_blob_pg_row & 0xff,
 			col->cur_blob_pg_row >> 8);
@@ -633,8 +633,8 @@ mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, MDBLengthType chunk_
 				mdb_buffer_dump(col->bind_ptr, 0, 16);
 		}
 		return len;
-	} else if ((ole_len & 0xf0000000) == 0) {
-		col->cur_blob_pg_row = mdb_get_int32(ole_ptr, 4);
+	} else if ((ole_len & 0xff000000) == 0) {
+		col->cur_blob_pg_row = mdb_get_uint32(ole_ptr, 4);
 		mdb_debug(MDB_DEBUG_OLE,"ole row = %d ole pg = %ld",
 			col->cur_blob_pg_row & 0xff,
 			col->cur_blob_pg_row >> 8);
@@ -647,7 +647,7 @@ mdb_ole_read(MdbHandle *mdb, MdbColumn *col, void *ole_ptr, MDBLengthType chunk_
 
 		if (col->bind_ptr) 
 			memcpy(col->bind_ptr, (char*)buf + row_start + 4, len - 4);
-		col->cur_blob_pg_row = mdb_get_int32(buf, row_start);
+		col->cur_blob_pg_row = mdb_get_uint32(buf, row_start);
 		mdb_debug(MDB_DEBUG_OLE, "next pg_row %d", col->cur_blob_pg_row);
 
 		return len - 4;
@@ -694,8 +694,9 @@ mdb_ole_read_full(MdbHandle *mdb, MdbColumn *col, MDBLengthType *size)
 #ifdef MDB_COPY_OLE
 MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBLengthType size)
 {
-	guint32 ole_len;
-	gint32 row_start, pg_row;
+    MDBLengthType ole_len;
+    MDBOffsetType row_start;
+    MDBPageRowType pg_row;
 	MDBLengthType len;
 	void *buf, *pg_buf = mdb->pg_buf;
 

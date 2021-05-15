@@ -1666,7 +1666,7 @@ SQLRETURN SQL_API SQLGetData(
     }
 
     // TODO: Pay attention to the actual data type requests, and do the following special cases:
-    //        SQL_C_DEFAULT selects the defautl C data type based on the SQL Data type of the source
+    //        SQL_C_DEFAULT selects the default C data type based on the SQL Data type of the source
     //        SQL_ERROR (07006) if we can't convert the data type
     //        SQL_ERROR (22003) if the whole number would be truncated (1.05->1 is OK, 65537 in 16b integer is error)
     //        SQL_ERROR (22007) invalid date/time format in the data file when trying to put into date,time, or timestamp

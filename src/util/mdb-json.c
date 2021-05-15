@@ -183,7 +183,7 @@ main(int argc, char **argv)
 	mdb_rewind_table(table);
 
 	bound_values = g_malloc(table->num_cols * sizeof(char *));
-	bound_lens = g_malloc(table->num_cols * sizeof(int));
+	bound_lens = g_malloc(table->num_cols * sizeof(SQLLEN));
 	for (i=0;i<table->num_cols;i++) {
 		/* bind columns */
 		bound_values[i] = g_malloc0(EXPORT_BIND_SIZE);
@@ -206,16 +206,22 @@ main(int argc, char **argv)
 					add_delimiter = 0;
 				}
 
+#ifndef MDB_COPY_OLE
 				if (col->col_type == MDB_OLE) {
 					value = mdb_ole_read_full(mdb, col, &length);
 				} else {
-					value = bound_values[i];
-					length = bound_lens[i];
+#endif
+                    value = bound_values[i];
+					length = (MDBLengthType)bound_lens[i];
+#ifndef MDB_COPY_OLE
 				}
-				print_col(outfile, col->name, value, col->col_type, length);
+#endif
+                print_col(outfile, col->name, value, col->col_type, length);
 				add_delimiter = 1;
+#ifndef MDB_COPY_OLE
 				if (col->col_type == MDB_OLE)
 					free(value);
+#endif
 			}
 		}
 		fputs(row_end, outfile);

@@ -103,6 +103,14 @@ main(int argc, char **argv)
 		return 1;
 	}
 
+#ifdef MDB_COPY_OLE
+    char *obj_props = g_malloc(mdb->bind_size);
+    SQLLEN kkd_size_ole;
+    if ((mdb_bind_column_by_name(table, "LvProp", obj_props, &kkd_size_ole)) == -1) {
+        fprintf(stderr, "Unable to bind column %s from table %s\n", "LvProp", table->name);
+    }
+#endif
+
 	while(mdb_fetch_row(table)) {
 		if (!strcmp(name, table_name)) {
 			found = 1;
@@ -111,14 +119,21 @@ main(int argc, char **argv)
 	}
 
 	if (found) {
+        MDBLengthType size;
+#ifdef MDB_COPY_OLE
+        void *kkd = obj_props;
+        size = (MDBLengthType) kkd_size_ole;
+#else
 		MdbColumn *col = g_ptr_array_index(table->columns, col_num-1);
-		MDBLengthType size;
 		void *kkd = mdb_ole_read_full(mdb, col, &size);
+#endif
 		if (size)
 			dump_kkd(mdb, kkd, size);
 		else
 			printf("No properties.\n");
+#ifndef MDB_COPY_OLE
 		free(kkd);
+#endif
 	}
 
 	g_free(name);

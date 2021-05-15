@@ -52,6 +52,13 @@ An ODBC driver for use with unixODBC or iODBC driver manager. Allows one to use 
 
 The Gnome MDB File Viewer and debugger. Alpha quality, moved to [mdbtools/gmdb2](https://github.com/mdbtools/gmdb2).
 
+## Additional Settings
+
+`MDB_COPY_OLE` - If set, the contents of OLE fields are copied into the bind locations. By default, OLE field's headers are copied only and
+you need to call `mdb_ole_read_full` (or similar) to retrieve the complete contents of the OLE fields.
+
+NOTE: if you're compiling this for use with ODBC, you definitely want this set.
+
 ## License
 
 Files in libmdb, libmdbsql, and libmdbodbc are licensed under LGPL and the

@@ -498,6 +498,12 @@ gint32 mdb_get_int32(void *buf, int offset)
 	memcpy(&l, (char*)buf + offset, 4);
 	return GINT32_FROM_LE(l);
 }
+guint32 mdb_get_uint32(void *buf, int offset)
+{
+    gint32 l;
+    memcpy(&l, (char*)buf + offset, 4);
+    return GUINT32_FROM_LE(l);
+}
 gint32 mdb_pg_get_int32(MdbHandle *mdb, int offset)
 {
 	if (offset <0 || offset+4 > mdb->fmt->pg_size) return -1;

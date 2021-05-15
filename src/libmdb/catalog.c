@@ -146,16 +146,17 @@ GPtrArray *mdb_read_catalog (MdbHandle *mdb, int objtype)
             // need this to be >0, since NULL is -1
             if (kkd_size_ole>0) {
                 // check for in-line first
+#ifdef MDB_COPY_OLE
                 entry->props = mdb_kkd_to_props(mdb, obj_props, (MDBLengthType)kkd_size_ole);
-                if (!entry->props) {
-                    MDBLengthType kkd_len;
-                    void *kkd = mdb_ole_read_full(mdb, col_props, &kkd_len);
-                    //mdb_buffer_dump(kkd, 0, kkd_len);
-                    if (kkd) {
-                        entry->props = mdb_kkd_to_props(mdb, kkd, kkd_len);
-                        free(kkd);
-                    }
+#else
+                MDBLengthType kkd_len;
+                void *kkd = mdb_ole_read_full(mdb, col_props, &kkd_len);
+                //mdb_buffer_dump(kkd, 0, kkd_len);
+                if (kkd) {
+                    entry->props = mdb_kkd_to_props(mdb, kkd, kkd_len);
+                    free(kkd);
                 }
+#endif
 			}
 		}
 	}

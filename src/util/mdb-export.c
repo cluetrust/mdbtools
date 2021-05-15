@@ -251,19 +251,25 @@ main(int argc, char **argv)
 					else
 						fputs(null_text, outfile);
 				} else {
-					if (col->col_type == MDB_OLE) {
-						value = mdb_ole_read_full(mdb, col, &length);
-					} else {
-						value = bound_values[i];
-						length = bound_lens[i];
-					}
+#ifndef MDB_COPY_OLE
+                    if (col->col_type == MDB_OLE) {
+                        value = mdb_ole_read_full(mdb, col, &length);
+                    } else {
+#endif
+                        value = bound_values[i];
+                        length = (MDBLengthType)bound_lens[i];
+#ifndef MDB_COPY_OLE
+                    }
+#endif
 					format_value(outfile, value, length,
 						     quote_text, col->col_type,
 						     escape_char, quote_char,
 						     bin_mode, export_flags,
 						     mdb->backend_name);
+#ifndef MDB_COPY_OLE
 					if (col->col_type == MDB_OLE)
 						free(value);
+#endif
 				}
 			}
 			fputs(")", outfile);
@@ -307,19 +313,25 @@ main(int argc, char **argv)
 					else
 						fputs(null_text, outfile);
 				} else {
-					if (col->col_type == MDB_OLE) {
-						value = mdb_ole_read_full(mdb, col, &length);
-					} else {
-						value = bound_values[i];
-						length = bound_lens[i];
-					}
+#ifndef MDB_COPY_OLE
+                    if (col->col_type == MDB_OLE) {
+                        value = mdb_ole_read_full(mdb, col, &length);
+                    } else {
+#endif
+                        value = bound_values[i];
+                        length = (MDBLengthType)bound_lens[i];
+#ifndef MDB_COPY_OLE
+                    }
+#endif
 					format_value(outfile, value, length,
 						     quote_text, col->col_type,
 						     escape_char, quote_char,
 						     bin_mode, export_flags,
 						     mdb->backend_name);
-					if (col->col_type == MDB_OLE)
-						free(value);
+#ifndef MDB_COPY_OLE
+                    if (col->col_type == MDB_OLE)
+                        free(value);
+#endif
 				}
 			}
 			if (insert_dialect) fputs(");", outfile);

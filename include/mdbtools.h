@@ -488,6 +488,7 @@ MDBLengthType mdb_read_alt_pg(MdbHandle *mdb, MDBOffsetType pg);
 unsigned char mdb_get_byte(void *buf, MDBOffsetType offset);
 gint16  mdb_get_int16(void *buf, MDBOffsetType offset);
 gint32  mdb_get_int32(void *buf, MDBOffsetType offset);
+guint32  mdb_get_uint32(void *buf, MDBOffsetType offset);
 gint32  mdb_get_int32_msb(void *buf, MDBOffsetType offset);
 float  mdb_get_single(void *buf, MDBOffsetType offset);
 double mdb_get_double(void *buf, MDBOffsetType offset);
