@@ -554,7 +554,7 @@ void mdb_set_boolean_fmt_words(MdbHandle *mdb);
 void mdb_set_boolean_fmt_numbers(MdbHandle *mdb);
 int mdb_read_row(MdbTableDef *table, MDBRowNumberType row);
 #ifdef MDB_COPY_OLE
-MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBRowNumberType size);
+MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBLengthType size);
 #endif
 
 /* money.c */

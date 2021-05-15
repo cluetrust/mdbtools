@@ -27,7 +27,7 @@ static int _mdb_attempt_bind(MdbHandle *mdb,
 	MdbColumn *col, unsigned char isnull, int offset, int len);
 static char *mdb_date_to_string(MdbHandle *mdb, const char *fmt, void *buf, int start);
 #ifdef MDB_COPY_OLE
-MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBRowNumberType size);
+MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBLengthType size);
 #endif
 
 #ifndef HAVE_REALLOCF
@@ -239,7 +239,7 @@ mdb_xfer_bound_bool(MdbHandle *mdb, MdbColumn *col, int value)
 	return 1;
 }
 static size_t
-mdb_xfer_bound_ole(MdbHandle *mdb, int start, MdbColumn *col, int len)
+mdb_xfer_bound_ole(MdbHandle *mdb, int start, MdbColumn *col, MDBLengthType len)
 {
 	size_t ret = 0;
 	if (len) {
@@ -692,7 +692,7 @@ mdb_ole_read_full(MdbHandle *mdb, MdbColumn *col, MDBLengthType *size)
 }
 
 #ifdef MDB_COPY_OLE
-MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBRowNumberType size)
+MDBLengthType mdb_copy_ole(MdbHandle *mdb, void *dest, MDBOffsetType start, MDBLengthType size)
 {
 	guint32 ole_len;
 	gint32 row_start, pg_row;

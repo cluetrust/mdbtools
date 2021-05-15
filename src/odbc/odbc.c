@@ -83,7 +83,7 @@ TypeInfo type_info[] = {
 };
 
 #define NUM_TYPE_INFO_COLS 19
-#define MAX_TYPE_INFO 11
+#define MAX_TYPE_INFO 12
 
 #ifdef ENABLE_ODBC_W
 static void _init_iconv(struct _hdbc* dbc)
