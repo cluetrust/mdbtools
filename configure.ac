@@ -24,7 +24,7 @@ dnl Checks for programs.
 AC_PROG_MAKE_SET
 m4_pattern_allow([AM_PROG_AR], [AM_PROG_AR])
 LT_INIT([win32-dll])
-AC_PROG_LEX
+AC_PROG_LEX([noyywrap])
 AC_PROG_YACC
 
 dnl Checks for header files.
@@ -58,12 +58,12 @@ dnl ---------------------------------------------------------------------
 
 sql=true
 AC_MSG_CHECKING( Are we using flex )
-if test "x$LEX" = "xflex"; then
-LFLAGS="$LFLAGS -i -8"
-AC_MSG_RESULT( yes );
+if $LEX -V | grep "flex.* 2[.]" >/dev/null 2>&1; then
+    LFLAGS="$LFLAGS -i -8"
+    AC_MSG_RESULT( yes );
 else
-AC_MSG_RESULT( no - SQL engine disable);
-sql=false
+    AC_MSG_RESULT( no - SQL engine disable);
+    sql=false
 fi
 
 if $YACC -V | grep "bison.* 3[.]" >/dev/null 2>&1; then
