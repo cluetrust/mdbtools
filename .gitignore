@@ -15,6 +15,7 @@ m4/
 config.log
 config.status
 configure
+configure~
 Makefile.in
 Makefile
 doc/*.1
