@@ -8,15 +8,22 @@ aclocal.m4
 autom4te.cache/
 build-aux/*
 !build-aux/config.rpath
+!build-aux/compile
+!build-aux/config.guess
+!build-aux/config.sub
+!build-aux/install-sh
+!build-aux/ltmain.sh
+!build-aux/missing
 m4/
 !m4/ccalias.m4
 !m4/iconv.m4
 !m4/readline.m4
-config.log
-config.status
-configure
+# GBP 2025-05-10: autoconf failing
+# config.log
+# config.status
+# configure
 configure~
-Makefile.in
+#Makefile.in
 Makefile
 doc/*.1
 INSTALL
